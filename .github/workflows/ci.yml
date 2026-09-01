@@ -1,0 +1,78 @@
+# CI for the Python side of the project (src/, tests/).
+#
+# Ordered cheapest-first, one gate per job, each depending on the last: a
+# formatting error fails in seconds and stops the run before mypy or pytest ever
+# starts. There is no build/publish/deploy job here — this repo ships an app
+# binary through an app-store review, not an image through a registry, and app
+# builds need macOS runners, which is a cost to add deliberately later, not by
+# default in every push.
+#
+# Python is pinned to 3.11 everywhere below. This is load-bearing, not
+# cosmetic: mypy is configured for 3.11 (pyproject.toml) and fails inside
+# numpy's bundled type stubs on a newer interpreter. `.python-version` at the
+# repo root pins the same version for local development; `python-version: "3.11"`
+# here makes CI's pin explicit rather than relying on that file alone.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    name: ruff check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          python-version: "3.11"
+      - run: uv sync
+      - run: uv run ruff check .
+
+  format:
+    name: ruff format --check
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          python-version: "3.11"
+      - run: uv sync
+      - run: uv run ruff format --check .
+
+  typecheck:
+    name: mypy
+    needs: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          python-version: "3.11"
+      - run: uv sync
+      - run: uv run mypy src
+
+  test:
+    name: pytest (unit only)
+    needs: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          python-version: "3.11"
+      - run: uv sync
+      # CI has no model weights and no exported artifacts on disk. `-m "not
+      # integration"` deselects the tests that need them (see
+      # .claude/skills/offline-suite) rather than letting them fail — or, worse,
+      # collect zero tests and exit 0. Export parity and artifact-size checks are
+      # `integration`-marked pending Lesson 04, when export.py stops being a
+      # docstring; they belong in their own CI stage once there is something in
+      # them to run, not as an empty job here.
+      - run: uv run pytest -m "not integration"

@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Smart Scene Analyzer",
+    "slug": "smart-scene-analyzer",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "assetBundlePatterns": ["assets/models/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.smartsceneanalyzer.app"
+    },
+    "android": {
+      "package": "com.smartsceneanalyzer.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Smart Scene Analyzer uses the camera to capture a still image for on-device object detection and depth estimation. The image is processed on this device and never leaves it.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Smart Scene Analyzer reads a photo you pick for on-device object detection and depth estimation. The image is processed on this device and never leaves it.",
+          "microphonePermission": false
+        }
+      ],
+      "react-native-fast-tflite",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          },
+          "android": {
+            "minSdkVersion": 33
+          }
+        }
+      ]
+    ]
+  }
+}
