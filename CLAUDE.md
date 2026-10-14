@@ -77,6 +77,7 @@ proposing anything that puts a server back on the request path.
 | `app/` | The Expo app. TypeScript. This is the product |
 | `app/assets/models/` | The bundled `.tflite` and `.pte` artifacts. **What is here is what runs** |
 | `app/src/fusion/` | The TypeScript port of `src/`'s fusion layer. Must agree with it |
+| `scripts/` | Operational helpers — converters, dataset assembly, training entry point, verification. Not importable production code; that lives in `src/` |
 | `tests/` | Unit, integration, and regression tests — including export parity |
 | `docs/` | Architecture, roadmap, model cards |
 | `docs/decisions/` | ADRs — one file per architectural decision |
@@ -414,6 +415,11 @@ thing they share. This is where a change breaks something nobody is looking at.
   parity, and an app-store release per model update — recorded, accepted, and the reason
   most of this file exists. See
   [`docs/decisions/0001-inference-target.md`](docs/decisions/0001-inference-target.md).
+- **Detection architecture: YOLO11 over RF-DETR.** Decided on export maturity onto the
+  on-device target ADR 0001 already committed to — Ultralytics' int8 TFLite export path
+  is proven; RF-DETR's mobile export path is not, and its recommended training route
+  (NAS) is separately forbidden on credit-budget grounds. See
+  [`docs/decisions/0004-detection-architecture-yolo11-over-rf-detr.md`](docs/decisions/0004-detection-architecture-yolo11-over-rf-detr.md).
 - Requirements, with the numbers this design is held to:
   [`docs/requirements.md`](docs/requirements.md).
 

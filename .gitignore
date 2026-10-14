@@ -50,3 +50,10 @@ app/android/
 .DS_Store
 .idea/
 *.swp
+
+# Training output and experiment tracking. Reproducible from a checkpoint, an export
+# config, and the MLflow params — not source. `*.pt` is already excluded above, but the
+# run directories also carry plots, results.csv and cached label indexes.
+runs/
+mlruns/
+mlflow.db

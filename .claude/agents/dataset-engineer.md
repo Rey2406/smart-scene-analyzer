@@ -1,7 +1,7 @@
 ---
 name: dataset-engineer
 description: Use for all Roboflow platform work — creating projects, uploading images, reviewing annotations, defining the class taxonomy, searching Roboflow Universe, creating dataset versions with preprocessing and augmentation, and exporting datasets for training. Use whenever the task touches the dataset as it exists on the platform.
-tools: Read, Grep, Glob, Write, Edit, Bash, Skill, mcp__roboflow__*
+tools: Read, Grep, Glob, Write, Edit, Bash, Skill, mcp__roboflow__*, mcp__plugin_roboflow_roboflow__*
 model: sonnet
 ---
 

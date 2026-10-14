@@ -385,6 +385,11 @@ The app and the export pipeline share the model files, and that is all they shar
   parity, and an app-store release per model update — recorded, accepted, and the reason
   most of this file exists. See
   [`docs/decisions/0001-inference-target.md`](docs/decisions/0001-inference-target.md).
+- **Detection architecture: YOLO11 over RF-DETR.** Decided on export maturity onto the
+  on-device target ADR 0001 already committed to — Ultralytics' int8 TFLite export path
+  is proven; RF-DETR's mobile export path is not, and its recommended training route
+  (NAS) is separately forbidden on credit-budget grounds. See
+  [`docs/decisions/0004-detection-architecture-yolo11-over-rf-detr.md`](docs/decisions/0004-detection-architecture-yolo11-over-rf-detr.md).
 - Requirements, with the numbers this design is held to:
   [`docs/requirements.md`](docs/requirements.md).
 

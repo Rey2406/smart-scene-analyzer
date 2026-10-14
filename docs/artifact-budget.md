@@ -33,6 +33,39 @@ largest line in this budget. Record it honestly rather than discovering it at su
 | ExecuTorch runtime | `react-native-executorch` native libs | Per-ABI, from the build output |
 | JS bundle + assets | Everything else | Metro bundle output |
 
+## Upstream checkpoints — measured 2026-10-01
+
+These are the **pre-export** checkpoints pulled in Lesson 03, not the artifacts the app
+ships. They are recorded because they are the first real numbers this budget has had, and
+because the ratio between them is the finding.
+
+| Model | Params | On disk | Stored as | int8 projection |
+|---|---|---|---|---|
+| YOLO11n | 2,624,080 | 5.35 MiB (`yolo11n.pt`) | fp16 | **~2.50 MiB** |
+| Depth Anything V2 Small | 24,785,089 | 94.59 MiB (HF cache) | fp32 | **~23.64 MiB** |
+| **Combined weights** | 27,409,169 | ~100 MiB | | **~26.1 MiB** |
+
+**The depth model is 9.4× the detection model.** Nothing in this project's framing
+anticipated that — detection is the headline feature and depth is the second signal, but
+depth is where essentially all of the bytes are. Both `⚠️ OPEN` items below should be read
+with that in mind: if the artifact budget fails, it fails on the depth model, and
+consolidating onto one runtime is a question about *which* runtime can carry a 24.8M-param
+ViT, not about the detector.
+
+**The int8 column is a projection, not a measurement.** It assumes one byte per parameter
+and ignores quantization metadata, per-channel scales, and the graph itself. Treat it as a
+floor. The real number comes from `ls -l app/assets/models/` after the export, and belongs
+in the Budget table below — not here.
+
+Note the YOLO11n checkpoint is **fp16 on disk**, which is why 5.35 MiB is smaller than the
+10.01 MiB its parameter count implies at fp32. Comparing checkpoint file sizes across
+models is comparing storage formats, not model sizes; the parameter count is the
+comparable figure.
+
+Not counted here, and larger than either model on some platforms: the two runtimes'
+**native libraries**, per ABI. Those arrive at the first `expo run:*` and are the line most
+likely to decide the device floor.
+
 ## Budget
 
 Fill the targets in before the first build, not after. A target chosen after seeing the
@@ -87,6 +120,15 @@ constraints enforced by discipline.
   proves unacceptable, the fix is to consolidate onto one runtime — either YOLO11 to
   `.pte` behind a wrapper module, or Depth Anything V2 to TFLite. Both are unverified, and
   both are a real workstream. Measure before assuming this is fine.
+
+  **Updated 2026-10-01 with the first measurement.** The checkpoints above change which
+  direction to consider first. Depth Anything V2 Small is 24.8M parameters against YOLO11n's
+  2.6M, so a consolidation that moves the *detector* onto ExecuTorch relocates 9% of the
+  weights, while one that moves the *depth model* onto TFLite relocates 91%. If
+  consolidation happens, moving YOLO11 to `.pte` is the smaller, lower-risk change — and it
+  leaves the 24.8M-param ViT on the runtime that was chosen for it. This is a hypothesis
+  from parameter counts, not a measurement of either runtime's native library size, which
+  remains the actual unknown.
 
 ## Reconciliation
 

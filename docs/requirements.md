@@ -26,11 +26,29 @@ consequence of the architecture, and saying so is the point.
 
 ### Object taxonomy
 
-Pending — see Lesson 02. The class list is an **open decision**; it is fixed in Lesson 02
-and recorded in `docs/taxonomy.md`, which does not exist yet.
+**Settled 2026-09-10. K = 10**, recorded in [`taxonomy.md`](taxonomy.md) with the
+rationale and rejected alternatives in
+[`decisions/0002-object-taxonomy.md`](decisions/0002-object-taxonomy.md):
 
-This blocks N3: an mAP target over an unknown number of classes is not a target. The
-provisional figure in N3 is marked as such.
+```
+0 bed     1 bin     2 chair     3 door     4 lamp
+5 pillow  6 screen  7 sofa      8 storage  9 table
+```
+
+The order is **alphabetical because the export is** — Roboflow sorts class names on
+export and it is not configurable. See
+[`decisions/0003-class-id-order-follows-the-export.md`](decisions/0003-class-id-order-follows-the-export.md).
+
+N3 is therefore no longer provisional — it is a target over 10 named classes.
+
+Two properties of this taxonomy constrain how N3 must be **reported**, not what it is:
+
+- **The class distribution is 21:1** (`chair` 25,026 objects, `bed` 1,188). A bare mAP is
+  dominated by `chair`. N3 is met only if per-class AP is reported alongside it.
+- **22.7% of source annotations are omitted** by design. An omitted object stays visible
+  in the image, so the detector is trained to emit no box for a sink or a counter. A
+  missed sink is the taxonomy working as specified and must be classified TAXONOMY, never
+  a recall regression against N3.
 
 ### Out of scope
 
@@ -55,7 +73,7 @@ provisional figure in N3 is marked as such.
 | N1 | End-to-end p95 latency, single 1280×720 image | **≤ 400 ms** | On-device, release build, **model load excluded** (that is N6). Capture/pick to drawn overlay. Reference devices below |
 | N1a | Bytes leaving the device per analysis | **0** | Airplane-mode run produces an identical result (F10) |
 | N2 | p50 latency, same image | **≤ 250 ms** | Same conditions as N1 |
-| N3 | Detection accuracy | mAP@50 ≥ **0.50** *(provisional)* | Held-out test split, dataset version stated. Provisional until the taxonomy is fixed in Lesson 02 |
+| N3 | Detection accuracy | mAP@50 ≥ **0.50** over the 10 classes of `docs/taxonomy.md` | Held-out test split, dataset version stated. **Per-class AP reported alongside** — the distribution is 21:1 and a bare mAP is dominated by `chair` |
 | N4 | Depth quality | Pairwise **depth-ordering accuracy ≥ 0.90** over annotated object pairs | Held-out test split. See the note below on why this is not δ<1.25 |
 | N5 | Sustained throughput | ≥ **20 consecutive analyses** with no thermal throttling and no memory growth | Repeated-run instrument on a reference device |
 | N6 | Cold model load, both models | ≤ **3.0 s** | First analysis after app launch. The user is watching a spinner for this |
@@ -130,7 +148,7 @@ provisional figure in N3 is marked as such.
 | Inference target: cloud vs. on-device | N1, N7–N10, the entire architecture | **decided** — on-device | [`0001-inference-target.md`](decisions/0001-inference-target.md) |
 | MLflow hosting | N19 | open | — |
 | Device floor (minimum supported handset) | N1, N2, N8, and whether two runtimes fit at all | open — see `docs/artifact-budget.md` | — |
-| Object taxonomy | The F-list, N3, all of Lesson 02 | open — Lesson 02 | — |
+| Object taxonomy | The F-list, N3, all of Lesson 02 | **settled 2026-09-10** — K=10 | [ADR 0002](decisions/0002-object-taxonomy.md) |
 | One runtime or two | N8, N9, N9a | open — the fallback is consolidating YOLO11 to `.pte` or Depth Anything V2 to TFLite | — |
 
 > The worksheet's row **"N1: client- or server-observed"** is resolved by ADR 0001 rather

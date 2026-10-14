@@ -62,7 +62,7 @@ strict = true
 files = ["src"]
 
 [[tool.mypy.overrides]]
-module = ["cv2.*", "roboflow.*", "ultralytics.*", "transformers.*", "timm.*"]
+module = ["cv2.*", "roboflow.*", "ultralytics.*", "transformers.*", "timm.*", "scipy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

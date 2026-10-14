@@ -1,7 +1,7 @@
 ---
 name: ml-engineer
 description: Use for model training, fine-tuning, and export — YOLO11 training runs, hyperparameter choices, MLflow experiment tracking, checkpoint selection, diagnosing why a run underperformed, and exporting/quantizing models to the TFLite and ExecuTorch artifacts the app runs. Use when the work is producing, improving, or packaging a model, as opposed to measuring one.
-tools: Read, Grep, Glob, Write, Edit, Bash, Skill, mcp__roboflow__*
+tools: Read, Grep, Glob, Write, Edit, Bash, Skill, mcp__roboflow__*, mcp__plugin_roboflow_roboflow__*
 model: sonnet
 ---
 

@@ -1,0 +1,146 @@
+[
+ {
+  "image": "data/v1/test/images/kv2_kinect2data_000426_2014-06-08_22-48-46_260595134347_rgbf000067-resize_0000067.jpg",
+  "note": "floor bin at the near left; storage shelf high on the back wall",
+  "boxes_near_to_far": [
+   [
+    3,
+    265,
+    149,
+    520
+   ],
+   [
+    74,
+    0,
+    619,
+    101
+   ]
+  ]
+ },
+ {
+  "image": "data/v1/test/images/kv2_kinect2data_000927_2014-06-09_16-32-30_260595134347_rgbf000123-resize_0000123.jpg",
+  "note": "desk in the mid-foreground; open doorway at the back left",
+  "boxes_near_to_far": [
+   [
+    108,
+    138,
+    452,
+    479
+   ],
+   [
+    1,
+    1,
+    133,
+    288
+   ]
+  ]
+ },
+ {
+  "image": "data/v1/test/images/kv2_align_kv2_2014-12-18_11-47-06_260595134347_0000037.jpg",
+  "note": "tall filing cabinet in the foreground; office chair behind and left of it",
+  "boxes_near_to_far": [
+   [
+    251,
+    1,
+    562,
+    490
+   ],
+   [
+    157,
+    103,
+    275,
+    300
+   ]
+  ]
+ },
+ {
+  "image": "data/v1/test/images/xtion_sun3ddata_mit_w85_basement_wg_small_lounge_1_0000280-000009405944_0000280-000009405944.jpg",
+  "note": "wooden chair in front of the piano; bookshelf against the back-right wall",
+  "boxes_near_to_far": [
+   [
+    233,
+    174,
+    409,
+    403
+   ],
+   [
+    506,
+    1,
+    591,
+    217
+   ]
+  ]
+ },
+ {
+  "image": "data/v1/test/images/xtion_sun3ddata_mit_32_123_123_1_0005688-000190610392_0005688-000190610392.jpg",
+  "note": "partition panel angled toward the camera at the left; table along the far wall",
+  "boxes_near_to_far": [
+   [
+    2,
+    0,
+    134,
+    373
+   ],
+   [
+    151,
+    176,
+    426,
+    367
+   ]
+  ]
+ },
+ {
+  "image": "data/v1/test/images/xtion_sun3ddata_mit_w85k2_k1_0006431-000215555043_0006431-000215555043.jpg",
+  "note": "dark chair back at the immediate bottom-left; monitor on the dresser behind it",
+  "boxes_near_to_far": [
+   [
+    13,
+    195,
+    136,
+    302
+   ],
+   [
+    145,
+    0,
+    356,
+    116
+   ]
+  ]
+ },
+ {
+  "image": "data/v1/test/images/xtion_sun3ddata_mit_lab_pdl_lab_pdl_nov_2_2012_scan1_erika_0000220-000008934525_0000220-000008934525.jpg",
+  "note": "boxes at the bottom-centre foreground; shelf further back at the right",
+  "boxes_near_to_far": [
+   [
+    99,
+    274,
+    396,
+    439
+   ],
+   [
+    497,
+    52,
+    590,
+    174
+   ]
+  ]
+ },
+ {
+  "image": "data/v1/test/images/kv2_kinect2data_003527_2014-05-22_14-47-40_094959634447_rgbf000101-resize_0000101.jpg",
+  "note": "chair in the mid-ground; the table box is a small far patch up the floor plane",
+  "boxes_near_to_far": [
+   [
+    235,
+    109,
+    455,
+    440
+   ],
+   [
+    0,
+    42,
+    129,
+    253
+   ]
+  ]
+ }
+]
