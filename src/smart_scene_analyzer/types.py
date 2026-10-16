@@ -203,6 +203,13 @@ class FusedDetection:
       at silently.
     - `depth_sample_count`: how many valid samples produced the values above. `0` means
       every depth field is `None`.
+    - `depth_quality`: a human-facing summary of which situation produced the values
+      above, in order of precedence — `"unavailable"` (no depth value at all: the depth
+      branch was off, or the box yielded nothing); `"fallback_full_box"` (the inset would
+      have collapsed below 1px, so the un-inset box was sampled instead — a small or
+      sliver-shaped box, not a wrong one); `"mixed_region"` (`depth_spread` at or above
+      `fusion.MIXED_REGION_SPREAD_THRESHOLD` — the box straddles a real depth
+      discontinuity); `"ok"` otherwise.
     """
 
     detection: Detection
@@ -211,6 +218,7 @@ class FusedDetection:
     depth_rank: int | None
     depth_spread: float | None
     depth_sample_count: int
+    depth_quality: Literal["ok", "unavailable", "fallback_full_box", "mixed_region"]
 
 
 @dataclass(frozen=True, slots=True)

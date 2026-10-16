@@ -1,0 +1,16 @@
+[
+  {
+    "image": "captures/scene_a/raw.png",
+    "boxes_near_to_far": [
+      [24.8, 261.6, 264.7, 638.3],
+      [404.4, 4.5, 1156.2, 417.8]
+    ]
+  },
+  {
+    "image": "captures/scene_b/raw.png",
+    "boxes_near_to_far": [
+      [395.2, 302.4, 807.1, 571.9],
+      [276.4, 41.1, 411.8, 328.6]
+    ]
+  }
+]

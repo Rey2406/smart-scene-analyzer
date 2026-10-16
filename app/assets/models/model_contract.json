@@ -1,0 +1,55 @@
+{
+  "detector": {
+    "file": "detector.tflite",
+    "sha256": "3f5bf68248e5c36abf4f2fb260c38f1ec27d76203a22cc61e054f510b93ad83d",
+    "registry_version": "v1-baseline",
+    "input": {
+      "shape": [
+        1,
+        3,
+        640,
+        640
+      ],
+      "dtype": "<class 'numpy.float32'>",
+      "layout": "NCHW",
+      "normalization": "[0,1] float",
+      "letterbox_pad_value": [
+        114,
+        114,
+        114
+      ]
+    },
+    "outputs": [
+      {
+        "index": 0,
+        "name": "serving_default_output_0_output_dequant",
+        "shape": [
+          1,
+          14,
+          8400
+        ],
+        "dtype": "<class 'numpy.float32'>",
+        "encoding": "cxcywh",
+        "normalized": true
+      }
+    ],
+    "labels": [
+      "bed",
+      "bin",
+      "chair",
+      "door",
+      "lamp",
+      "pillow",
+      "screen",
+      "sofa",
+      "storage",
+      "table"
+    ],
+    "default_conf_threshold": 0.25,
+    "default_iou_threshold": 0.45,
+    "max_detections": 100
+  },
+  "exported_at": "2026-10-15T19:28:12.067232+00:00",
+  "exporter_version": "scripts/export.py@lesson04-step4",
+  "dataset_version": "v1"
+}

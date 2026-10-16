@@ -19,7 +19,7 @@ a parser that silently finds nothing reports a balance of zero and blocks everyt
 | Plan | Public (free) |
 | Starting balance | 20.0 |
 | **Remaining** | **0.0** |
-| Last reconciled | 2026-09-28 — **against the platform**, which reported `creditsRemaining: 0` in an `INSUFFICIENT_CREDITS` error from `versions_generate`. The previous figure of 20.0 was this project's self-imposed cap, never a measured balance |
+| Last reconciled | 2026-10-16 — **by tool-call audit, not a dashboard visit.** The last platform-measured balance is still 2026-09-28's `creditsRemaining: 0`. Lesson 04 made **zero** Roboflow MCP calls of any kind across steps 1–13 — every operation (export, fusion, parity, latency measurement) ran locally — so the balance cannot have moved, and this reconciliation is confirming "no calls made" from complete session history rather than re-reading the platform. The next lesson that actually bills should re-check `app.roboflow.com/<workspace>/settings/usage` directly rather than extend this shortcut |
 
 ---
 
@@ -105,6 +105,7 @@ turned out to be different from the table, a free-tier limit you hit.
 
 | Date | Note |
 |---|---|
+| 2026-10-16 | **Lesson 04's planned 2.0-credit allocation (a hosted-API latency/cost comparison) went entirely unspent — not by choice, by necessity.** The balance was already 0.0 before Lesson 04 began (discovered 2026-09-28). The execution-target comparison (`docs/execution-target-comparison.md`) still names the cloud options as contrast, but pricing came from this ledger's own rate table and ADR 0001, not a fresh hosted-API call, because one was never affordable. Worth flagging for `docs/credit-budget.md`'s own Planned allocation table, which still shows Lesson 04 at 2.0 as if it were available |
 | 2026-09-08 | `projects_create` billed **0 credits** — no rate exists for project creation, and `credit_gate.py` is deliberately scoped to `trainings_create\|models_infer\|versions_generate\|workflows_run`, so it does not gate this call. Recorded as a free operation taken deliberately; no Ledger row, because a row with an estimate and a blank Actual reads as *pending* to the gate. |
 | 2026-09-08 | Project named with a date suffix (`-2026-09-08`) rather than the bare `smart-scene-analyzer` the lesson uses. Roboflow appended no random suffix, so the ID equals the display name. Lesson 02 steps 9 and 15 were changed to take a `<project-id>` placeholder read from this file rather than a hardcoded slug. |
 | 2026-10-01 | Ledger rows closed out. The **version-generation row is reconciled at `Actual` 0.00** — the call was *refused* with `INSUFFICIENT_CREDITS`, so nothing billed. It had been sitting with an estimate and a blank actual, which `credit_gate.py` reads as a **standing authorization**: a 0.93-credit approval for an operation that never ran, which would have waved through the next billed call. A refused operation must be closed at zero, not left pending. |

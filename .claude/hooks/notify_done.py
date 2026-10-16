@@ -21,6 +21,7 @@ It never blocks. A notifier that can fail a turn is a notifier that will.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import platform
 import shutil
@@ -67,10 +68,8 @@ def notify(body: str) -> None:
         sys.stderr.write(f"\a{TITLE}: {body}\n")
         return
 
-    try:
+    with contextlib.suppress(OSError, subprocess.TimeoutExpired):
         subprocess.run(command, capture_output=True, timeout=5, check=False)
-    except (OSError, subprocess.TimeoutExpired):
-        pass
 
 
 def main() -> None:

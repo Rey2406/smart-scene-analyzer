@@ -33,6 +33,30 @@ depth = [
     "transformers>=4.46",  # Lesson 03 — Depth Anything V2, inference only
     "timm>=1.0",           # Lesson 03 — backbone Depth Anything V2 depends on
 ]
+export = [
+    # Lesson 04 — YOLO11 -> int8 TFLite. As of ultralytics 8.4.118, format='tflite' and
+    # int8=True are DEPRECATED in favor of format='litert' (Google's TFLite rebrand) and
+    # quantize=8, which routes through `litert_torch` directly rather than the older
+    # onnx2tf-based path — found by actually running the export, not from documentation.
+    "litert-torch>=0.9.0",
+    "ai-edge-litert>=2.1.4",
+    "tensorflow>=2.16",
+    "onnx>=1.16",
+    "onnx2tf>=1.26",
+    "onnxslim>=0.1.31",
+    "onnxruntime>=1.19",
+    "sng4onnx>=1.0.1",
+    # Lesson 04 — Depth Anything V2 -> ExecuTorch. `optimum[executorch]` is NOT a
+    # real extra as of optimum 2.3.0 (uv warns and silently skips it) — the actual
+    # package is the standalone `optimum-executorch`, which pulls in `executorch`
+    # itself and downgrades `optimum` (2.3.0 -> 2.0.0) and `transformers` (5.15.0
+    # -> 5.0.0rc1, a release candidate). Verified the real depth inference path
+    # (not just the mocked offline suite) still runs correctly under the
+    # downgrade before pinning this. Neither export toolchain is otherwise
+    # verified against this project's models; a failure here is the finding this
+    # lesson step asks for, not a bug to silently route around.
+    "optimum-executorch>=1.1",
+]
 
 [dependency-groups]
 dev = [
@@ -62,7 +86,19 @@ strict = true
 files = ["src"]
 
 [[tool.mypy.overrides]]
-module = ["cv2.*", "roboflow.*", "ultralytics.*", "transformers.*", "timm.*", "scipy.*"]
+module = [
+    "cv2.*",
+    "roboflow.*",
+    "ultralytics.*",
+    "transformers.*",
+    "timm.*",
+    "scipy.*",
+    "yaml.*",
+    "ai_edge_litert.*",
+    "tensorflow.*",
+    "executorch.*",
+    "optimum.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -13,19 +13,41 @@ The IoU threshold and the per-image cap are **assumptions, not requirements** (A
 changing what counts as a duplicate, the cap by truncating crowded scenes. They belong in
 the artifact manifest so that the app and the reference use the same numbers, rather than
 in two independent constants in two languages.
-
-The cap also bounds the latency allocations for stages S5 and S6: fusion cost is
-`max_detections x MAX_SAMPLES`, which is what makes S6's 15 ms a number rather than a hope.
-
-Planned public surface:
-
-    def nms(
-        detections: Sequence[Detection],   # xyxy absolute px, any single space
-        iou_threshold: float,
-        max_detections: int,
-        class_agnostic: bool = False,
-    ) -> list[Detection]
-        \"\"\"-> the surviving detections, same space as the input, sorted by descending
-        confidence and truncated to `max_detections`. An empty input returns an empty
-        list, which is a successful result.\"\"\"
 """
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+from smart_scene_analyzer.geometry.boxes import iou as box_iou
+from smart_scene_analyzer.types import Detection
+
+
+def nms(
+    detections: Sequence[Detection],
+    iou_threshold: float,
+    max_detections: int,
+    class_agnostic: bool = False,
+) -> list[Detection]:
+    """Greedy NMS: sort by confidence, keep the best, drop anything that overlaps it past
+    `iou_threshold`, repeat. Same space in, same space out. An empty input returns an
+    empty list, which is a successful result (F8).
+    """
+    if not detections:
+        return []
+
+    ordered = sorted(detections, key=lambda d: d.confidence, reverse=True)
+    kept: list[Detection] = []
+    for candidate in ordered:
+        if len(kept) >= max_detections:
+            break
+        suppressed = False
+        for k in kept:
+            if not class_agnostic and k.class_id != candidate.class_id:
+                continue
+            if box_iou(k.bbox, candidate.bbox) > iou_threshold:
+                suppressed = True
+                break
+        if not suppressed:
+            kept.append(candidate)
+    return kept

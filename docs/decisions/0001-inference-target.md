@@ -62,6 +62,25 @@ numerically equivalent to the reference. The fusion algorithm exists twice, in P
 TypeScript, and only a shared fixture set keeps the two honest. Shipping a fix means an
 app-store review.
 
+**Confirmed harder, Lesson 04 (2026-10-16) — not predicted anymore, measured:**
+
+- **The export toolchain churned out from under the plan.** `ultralytics` deprecated
+  `format='tflite'`/`int8=True` mid-release (now `format='litert'`/`quantize=8`), and the
+  dependency list researched from documentation (`tensorflow`, `onnx2tf`, ...) was wrong
+  for the version actually installed — the real requirement (`litert-torch`,
+  `ai-edge-litert`) was only found by running the export and reading the failure. This is
+  exactly the "an export toolchain" cost named above, now with a specific shape: it is not
+  a one-time cost, it is a target that moves under a pinned dependency.
+- **One of the two models could not be exported at all.** `optimum-executorch` 1.1.0 has
+  no `depth-estimation` task registered — not a quantization or accuracy failure, a
+  missing capability in the library this plan depends on. The fusion-layer duplication
+  cost above assumed both sides would exist to duplicate; right now only detection does.
+- **Quantization is not free on the classes that were already weak.** `storage`'s mean
+  confidence dropped 0.133 under int8 — small in isolation, but stacked on a class that
+  was already this model's second-weakest (`docs/evaluation-v1.md`). The export cost is
+  not evenly distributed across classes, and nothing in the original Context anticipated
+  that a fixed per-model cost would land harder on specific, already-fragile classes.
+
 **What now depends on this decision:**
 
 - `src/smart_scene_analyzer/` — the export pipeline and the reference implementation the
@@ -80,16 +99,81 @@ app-store review.
 architecture that puts a request on the inference path. Adding one back is not a change of
 implementation; it is a reversal of this ADR.
 
+## Amendment — Lesson 04 measurements (2026-10-16)
+
+The options above were argued from latency arithmetic and credit economics (ADR 0001's
+original context). This project has since actually exported, quantized, and measured one
+side of that argument — the numbers below replace assumption with evidence, on the
+detection model; the depth model's export failed outright, which is itself a finding.
+
+**Artifact sizes** (`docs/artifact-budget.md`, 2026-10-15):
+
+| Artifact | Size | Status |
+|---|---|---|
+| Detection (`detector.tflite`, int8) | **2.90 MiB** | Exported successfully |
+| Depth (`depth.pte`, ExecuTorch) | — | **FAILED.** `optimum-executorch` 1.1.0 has no `depth-estimation` export task registered — confirmed from its source, not inferred from the error alone. Not a quantization or accuracy problem; a toolchain gap. See `docs/model-card-v1.md`'s Depth "Exported artifact" section |
+
+Only one of the two planned on-device artifacts exists. N9a's 40 MB combined budget is
+therefore unverified on its real constraint — comparing two artifacts — because there is
+only one to weigh.
+
+**Export parity** (`tests/test_export_parity.py`, 8 held-out test-split images, 2026-10-15):
+
+| Field | Value |
+|---|---|
+| Match criterion (tolerance) | Same class, IoU ≥ 0.5 — accepted *before* the run, not fit to the result |
+| Match rate | 34/37 = 91.9% |
+| Worst per-class confidence delta | `storage`, **−0.133** (quantization shifted this already-weak class's confidence down further; `door` moved the other way, +0.123 — evidence the shift is quantization noise, not one-directional) |
+| Mean IoU, every class | ≥ 0.866 — box geometry well preserved |
+| Depth parity | **Not measurable** — no `.pte` artifact exists to compare |
+
+**Default execution backend per platform** (`docs/execution-target-comparison.md`,
+2026-10-15, every availability claim cited with a URL and check date):
+
+| Platform | Default | Why not the alternatives |
+|---|---|---|
+| Android | **XNNPACK/CPU** | NNAPI is deprecated as of Android 15 (Google's own guidance now points to GPU/CPU); GPU delegate is plausible on paper but unmeasured on any real device from this project |
+| iOS | **XNNPACK/CPU** | CoreML/ANE **cannot run this artifact at all** — the delegate only supports float32/FP16, and this artifact has int8-quantized internals; GPU/Metal's behavior (including Simulator support) is undocumented |
+
+Measured latency: **11.47 ms p50 / 11.69 ms p95** for detection, XNNPACK/CPU, n=30 — on
+this development machine (Apple M5 Pro), explicitly **not** a phone measurement. Every
+phone-specific row (real device CPU, NNAPI, CoreML, GPU delegate) is marked UNMEASURED in
+`docs/execution-target-comparison.md`, not estimated.
+
+**What this amendment does not change.** The original Decision stands: both models still
+target on-device execution, for the same latency-budget and credit-liability reasons in
+the original Context. Nothing measured here argues for moving inference back to the cloud
+— see that document's own Round 4, which works through exactly this question and finds no
+measurement in the table with a path back to Option A or B. What changed is confidence:
+the detection half of the decision is now backed by a real artifact and a real parity
+number instead of an estimate; the depth half is not yet backed by anything, because it
+does not yet exist.
+
 ## Revisit when
 
 Any of the following becomes true:
 
 - The combined size of two native runtimes plus two artifacts proves unaffordable against
   `docs/artifact-budget.md`, **and** consolidating onto a single runtime does not recover
-  it. (Consolidation is the first fallback, not a return to the cloud.)
+  it. (Consolidation is the first fallback, not a return to the cloud.) **Partially
+  unmeasurable right now**: only the detection artifact's size (2.90 MiB) is known; the
+  depth side of this comparison cannot be evaluated until an export exists.
 - Peak RSS with both models loaded excludes a device class the product must support.
+  **Still open** — requires Lesson 05's on-device measurement; nothing in Lesson 04 could
+  measure this on a development machine.
 - A required capability genuinely cannot run on-device — a model too large to quantize
-  without unacceptable accuracy loss, for instance.
+  without unacceptable accuracy loss, for instance. **Not yet triggered, but the closest
+  live example of what this looks like**: the depth export's current failure is a
+  toolchain-support gap (`optimum-executorch` has no depth-estimation task), not a proof
+  that Depth Anything V2 cannot run on-device at all — a lower-level export path direct on
+  ExecuTorch's core APIs remains untried. If that path is attempted and *also* fails for a
+  capability reason (not a library-support reason), **that** would trigger this clause.
+  Confusing a toolchain gap for a capability gap here would be the wrong kind of mistake —
+  it would abandon on-device depth over a library version, not a real constraint.
 
 Cost or convenience alone is not a trigger. The offline and privacy properties above are
 load-bearing product behaviour, not implementation detail.
+
+Lesson 05 measures on-device latency and peak RSS on real hardware — the two rows above
+still marked open. That measurement, not this amendment, is what actually closes or
+triggers the first two bullets.

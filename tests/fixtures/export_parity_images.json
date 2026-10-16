@@ -1,0 +1,13 @@
+{
+  "_comment": "A fixed, deterministic set of test-split images for export parity (Lesson 04, step 6). Paths are relative to the project root. data/v1 is gitignored (versioned in Roboflow, not git) — this file commits the LIST, not the binaries, so `tests/test_export_parity.py` is reproducible on any machine that has run the Lesson 03 dataset steps, and skips cleanly (not fails) when it has not.",
+  "images": [
+    "data/v1/test/images/kv2_align_kv2_2014-12-18_11-47-06_260595134347_0000037.jpg",
+    "data/v1/test/images/kv2_align_kv2_2014-12-18_11-50-34_260595134347_0000151.jpg",
+    "data/v1/test/images/kv2_align_kv2_2014-12-18_11-53-29_260595134347_0000141.jpg",
+    "data/v1/test/images/kv2_align_kv2_2014-12-18_12-01-55_260595134347_0000054.jpg",
+    "data/v1/test/images/kv2_align_kv2_2014-12-18_12-02-10_260595134347_0000030.jpg",
+    "data/v1/test/images/kv2_align_kv2_2014-12-18_12-02-52_260595134347_0000152.jpg",
+    "data/v1/test/images/kv2_align_kv2_2014-12-18_12-08-03_260595134347_0000074.jpg",
+    "data/v1/test/images/kv2_align_kv2_2014-12-18_12-08-50_260595134347_0000121.jpg"
+  ]
+}

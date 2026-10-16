@@ -59,6 +59,7 @@ def fake_loader(raster: np.ndarray):
 
 # ------------------------------------------------- the test worth arguing about
 
+
 def test_region_actually_uses_the_depth_map(known_gradient):
     """A reducer that ignored its map would pass every other test in this file.
 
@@ -214,8 +215,7 @@ def test_no_public_name_implies_a_metric_unit():
     offenders = [
         name
         for name in dir(depth)
-        if not name.startswith("_")
-        and any(bad in name.lower() for bad in BANNED_SUBSTRINGS)
+        if not name.startswith("_") and any(bad in name.lower() for bad in BANNED_SUBSTRINGS)
     ]
     assert offenders == []
 

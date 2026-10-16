@@ -136,9 +136,7 @@ def upload(
     if dry_run:
         missing = [p.stem for p in todo if p.stem not in id_map]
         out.no_image_id = len(missing)
-        out.boxes = sum(
-            len([ln for ln in p.read_text().splitlines() if ln.strip()]) for p in todo
-        )
+        out.boxes = sum(len([ln for ln in p.read_text().splitlines() if ln.strip()]) for p in todo)
         print(f"\nDRY RUN — would post {len(todo) - len(missing)} annotations")
         if missing:
             print(f"  {len(missing)} label files have no image ID; first few: {missing[:5]}")

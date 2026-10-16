@@ -27,13 +27,119 @@ side of the boundary and taken on faith on the other:
 
 The label list's contents are an **open decision** (the taxonomy, Lesson 02). This module
 records whatever order it is given and computes nothing from its length.
-
-Planned public surface:
-
-    class ArtifactManifest(BaseModel)    # the schema of C11, validated on read
-    def write(manifest: ArtifactManifest, path: Path) -> None
-    def read(path: Path) -> ArtifactManifest
-    def verify_files(manifest: ArtifactManifest, models_dir: Path) -> list[str]
-        \"\"\"-> human-readable mismatches: a missing file, or a sha256 that does not match
-        the manifest. Empty list means the bundled artifacts are the ones described.\"\"\"
 """
+
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+from typing import Literal
+
+from pydantic import BaseModel
+
+
+class QuantParams(BaseModel):
+    """int8 affine quantization: `real_value = scale * (quantized_value - zero_point)`."""
+
+    scale: float
+    zero_point: int
+
+
+class DetectorInputSpec(BaseModel):
+    shape: list[int]
+    dtype: str
+    layout: Literal["NHWC", "NCHW"]
+    quant: QuantParams | None = None
+    normalization: str
+    letterbox_pad_value: list[int]
+
+
+class DetectorOutputSpec(BaseModel):
+    index: int
+    name: str
+    shape: list[int]
+    dtype: str
+    encoding: Literal["cxcywh", "xyxy"]
+    normalized: bool
+
+
+class DetectorManifest(BaseModel):
+    file: str
+    sha256: str
+    registry_version: str
+    input: DetectorInputSpec
+    outputs: list[DetectorOutputSpec]
+    labels: list[str]
+    default_conf_threshold: float
+    default_iou_threshold: float
+    max_detections: int
+
+
+class DepthInputSpec(BaseModel):
+    shape: list[int]
+    dtype: str
+    layout: Literal["NHWC", "NCHW"]
+    normalization: str
+
+
+class DepthOutputSpec(BaseModel):
+    shape: list[int]
+    dtype: str
+    semantics: Literal["relative-inverse-depth-larger-is-nearer"]
+
+
+class DepthManifest(BaseModel):
+    file: str
+    sha256: str
+    registry_version: str
+    input: DepthInputSpec
+    output: DepthOutputSpec
+
+
+class ArtifactManifest(BaseModel):
+    """The schema of C11. `detector` and/or `depth` may be absent on a partial export —
+    `scripts/export.py --detection` writes only the detector half, merging with whatever
+    depth half an earlier run already wrote."""
+
+    detector: DetectorManifest | None = None
+    depth: DepthManifest | None = None
+    exported_at: str
+    exporter_version: str
+    dataset_version: str | None = None
+
+
+def sha256_of(path: Path) -> str:
+    """The file's sha256, read in chunks rather than loaded whole (artifacts are tens of MB)."""
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write(manifest: ArtifactManifest, path: Path) -> None:
+    path.write_text(manifest.model_dump_json(indent=2, exclude_none=True) + "\n")
+
+
+def read(path: Path) -> ArtifactManifest:
+    return ArtifactManifest.model_validate_json(path.read_text())
+
+
+def verify_files(manifest: ArtifactManifest, models_dir: Path) -> list[str]:
+    """Human-readable mismatches: a missing file, or a sha256 that does not match the
+    manifest. Empty list means the bundled artifacts are the ones described."""
+    problems: list[str] = []
+    for name, sub in (("detector", manifest.detector), ("depth", manifest.depth)):
+        if sub is None:
+            continue
+        p = models_dir / sub.file
+        if not p.is_file():
+            problems.append(f"{name}: missing file {p}")
+            continue
+        actual = sha256_of(p)
+        if actual != sub.sha256:
+            problems.append(
+                f"{name}: sha256 mismatch for {p} "
+                f"(manifest {sub.sha256[:12]}… != actual {actual[:12]}…)"
+            )
+    return problems
