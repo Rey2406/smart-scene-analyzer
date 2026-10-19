@@ -74,8 +74,8 @@ number is not a budget, it is a description.
 | Line | Target | Measured | Date | Notes |
 |---|---|---|---|---|
 | Detection model | *(no target was pre-stated — not filled in before this measurement, so none is claimed now)* | **2.90 MiB** (int8) | 2026-10-15 | `v1-baseline` → `app/assets/models/detector.tflite`. **fp32 size not yet produced** — this run only exported int8, so the quantization delta this row asks for is still missing; needs a follow-up fp32 export to compare against |
-| Depth model | | **FAILED** | 2026-10-15 | Export attempted, not produced — `optimum-executorch` 1.1.0 has no `depth-estimation` export task registered. See `docs/model-card-v1.md`'s Depth "Exported artifact" section for the confirmed root cause |
-| **Bundled models, total** | | | | |
+| Depth model | | **24.35 MiB** (int8) | 2026-10-19 | Exported via the lower-level ExecuTorch path (`torch.export` + PT2E `XNNPACKQuantizer` + `to_edge_transform_and_lower`), not `optimum-cli` — that CLI has no `depth-estimation` recipe at all, confirmed and unchanged as of this date. Unquantized float32 was 94.45 MiB; int8 (per-channel symmetric, calibrated on 8 real images) brought it to this figure at a measured 0.9447 mean rank correlation against PyTorch eager. See `docs/model-card-v1.md`'s Depth "Exported artifact" section |
+| **Bundled models, total** | | **27.25 MiB** | 2026-10-19 | 2.90 + 24.35 — inside N9a's 40 MB combined budget, measured on both artifacts |
 | Android install size | | | | From the Play Console or `bundletool` |
 | iOS install size | | | | From App Store Connect or a local `.ipa` |
 | Peak RSS, both models loaded | | | | The number that decides which phones are excluded |

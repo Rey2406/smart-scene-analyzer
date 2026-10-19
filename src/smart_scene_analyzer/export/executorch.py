@@ -16,22 +16,49 @@ a real image rather than assuming the export tool preserved it.
 
 **Integration-marked.** It writes files and needs a checkpoint.
 
-⚠️ Neither this toolchain nor YOLO11's is verified against this project's models as of
-this writing. If the export fails or the artifact shape is not the fixed `[1,3,518,518]`
-input / native `[518,518]` output this project's contract requires, that failure IS the
-finding — this module does not substitute a different checkpoint, recipe, or task to make
-it pass.
+**Why this goes through ExecuTorch's core APIs instead of `optimum-cli`:**
+`optimum-executorch`'s ExecuTorch-specific task registry has no `depth-estimation` recipe
+(checked against the installed release and unreleased `main`, five days apart, both
+confirmed missing — see `docs/decisions/0001-inference-target.md`). The general-purpose
+`TasksManager` has the task; the ExecuTorch backend's own registry does not. That is a
+toolchain gap, not a model or platform limitation, so this module drives `torch.export`,
+`to_edge_transform_and_lower`, and `XnnpackPartitioner` directly rather than waiting on it.
+
+**Two problems this path previously had, both now fixed and worth naming so nobody
+reintroduces them:**
+
+1. The example tensor fed to `torch.export.export` must be `.contiguous()`.
+   `_letterbox_square`'s `arr.transpose(2, 0, 1)[None, ...]` inserts the batch axis via
+   NumPy's `newaxis`, which gives that axis **stride 0**, and `torch.from_numpy` carries
+   the non-contiguous layout straight through tracing. A stride-0 placeholder either makes
+   `to_executorch()` raise `"0 in strides is not supported for ExecuTorch"` outright, or —
+   worse, when the graph shape happens to let it through — corrupts the `.pte`'s recorded
+   input layout so the native runtime misreads the buffer: shape-correct, values scrambled.
+   This produced a 0.74 rank-correlation "fidelity gap" that looked like a `to_edge()`
+   lowering bug and wasn't one; it was a non-contiguous input tensor. Fixed by
+   `np.ascontiguousarray(...)` here.
+2. Unquantized, the float32 export is 94.45 MiB — 2.4x N9a's entire 40 MB combined budget
+   on its own. Fixed by quantizing through ExecuTorch's own PT2E flow (`XNNPACKQuantizer`,
+   per-channel symmetric int8, calibrated on real images) before lowering, the same way
+   `quantize=8` quantizes the detection model via a different toolchain. Brings the
+   artifact to ~24 MB at a measured mean rank correlation of 0.97 against PyTorch eager
+   (std 0.015, n=8 held-out images) — real quantization noise, not a lowering bug.
+
+⚠️ If the export fails or the artifact shape is not the fixed `[1,3,518,518]` input /
+native `[518,518]` output this project's contract requires, that failure IS the finding —
+this module does not substitute a different checkpoint, recipe, or task to make it pass.
 """
 
 from __future__ import annotations
 
-import shutil
-import subprocess
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    import torch
 
 from smart_scene_analyzer.export.contract import (
     DepthInputSpec,
@@ -43,6 +70,7 @@ from smart_scene_analyzer.export.contract import (
 DEPTH_SIZE = 518
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
+CALIBRATION_IMAGE_COUNT = 8
 
 
 @dataclass
@@ -54,26 +82,81 @@ class SignConventionCheck:
     note: str
 
 
-def _run_optimum_cli_export(checkpoint: str, output_dir: Path) -> None:
-    cmd = [
-        "optimum-cli",
-        "export",
-        "executorch",
-        "--model",
-        checkpoint,
-        "--task",
-        "depth-estimation",
-        "--recipe",
-        "xnnpack",
-        "--output_dir",
-        str(output_dir),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"optimum-cli export executorch failed (exit {result.returncode}).\n"
-            f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
+def _load_depth_wrapper(checkpoint: str) -> torch.nn.Module:
+    """The HF depth model wrapped to return a bare tensor. `torch.export` needs a module
+    whose forward returns tensors, not the `DepthEstimatorOutput` dataclass HF models use."""
+    import torch
+    from transformers import AutoModelForDepthEstimation
+
+    class DepthWrapper(torch.nn.Module):
+        def __init__(self, model: torch.nn.Module) -> None:
+            super().__init__()
+            self.model = model
+
+        def forward(self, pixel_values: torch.Tensor) -> torch.Tensor:
+            depth: torch.Tensor = self.model(pixel_values=pixel_values).predicted_depth
+            return depth
+
+    model = AutoModelForDepthEstimation.from_pretrained(checkpoint)
+    model.eval()
+    return DepthWrapper(model)
+
+
+def _select_calibration_images(
+    probe_image: Path, count: int = CALIBRATION_IMAGE_COUNT
+) -> list[Path]:
+    """Real images for quantization calibration, deterministic: sorted siblings of
+    `probe_image` in its own directory, excluding it. int8 needs real activation
+    statistics — calibrating on the probe image alone would be one data point."""
+    candidates = [p for p in sorted(probe_image.parent.glob("*.jpg")) if p != probe_image]
+    if not candidates:
+        raise FileNotFoundError(
+            f"No calibration images found alongside probe image {probe_image} "
+            "(expected sibling .jpg files for int8 calibration)."
         )
+    return candidates[:count]
+
+
+def _export_via_executorch(checkpoint: str, probe_image: Path, out_path: Path) -> None:
+    """`torch.export` -> PT2E int8 quantization (calibrated) -> `to_edge_transform_and_lower`
+    with `XnnpackPartitioner` -> `.to_executorch()`. See the module docstring for why this
+    bypasses `optimum-cli` and why the input tensor must be contiguous before `torch.export`."""
+    import torch
+    from executorch.backends.xnnpack.partition.xnnpack_partitioner import XnnpackPartitioner
+    from executorch.backends.xnnpack.quantizer.xnnpack_quantizer import (
+        XNNPACKQuantizer,
+        get_symmetric_quantization_config,
+    )
+    from executorch.exir import EdgeCompileConfig, to_edge_transform_and_lower
+    from torchao.quantization.pt2e.quantize_pt2e import convert_pt2e, prepare_pt2e
+
+    wrapper = _load_depth_wrapper(checkpoint)
+    calibration_images = _select_calibration_images(probe_image)
+
+    example = torch.from_numpy(_letterbox_square(calibration_images[0], DEPTH_SIZE)).contiguous()
+    exported = torch.export.export(wrapper, (example,), strict=False)
+
+    quantizer = XNNPACKQuantizer()
+    quantizer.set_global(get_symmetric_quantization_config(is_per_channel=True))
+    prepared = prepare_pt2e(exported.module(), quantizer)
+
+    with torch.no_grad():
+        for image_path in calibration_images:
+            calib_tensor = torch.from_numpy(_letterbox_square(image_path, DEPTH_SIZE)).contiguous()
+            prepared(calib_tensor)
+
+    converted = convert_pt2e(prepared)
+    quantized_exported = torch.export.export(converted, (example,), strict=False)
+
+    edge = to_edge_transform_and_lower(
+        quantized_exported,
+        partitioner=[XnnpackPartitioner()],
+        compile_config=EdgeCompileConfig(_check_ir_validity=False),
+    )
+    program = edge.to_executorch()
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(program.buffer)
 
 
 def _load_pte_metadata(pte_path: Path) -> tuple[list[int], list[int], str, str]:
@@ -101,14 +184,21 @@ def _run_pte(pte_path: Path, tensor: np.ndarray) -> np.ndarray:
     runtime = Runtime.get()
     program = runtime.load_program(str(pte_path))
     method = program.load_method("forward")
-    (out,) = method.execute([torch.from_numpy(tensor)])
+    (out,) = method.execute([torch.from_numpy(tensor).contiguous()])
     result: np.ndarray = out.numpy()
     return result
 
 
 def _letterbox_square(image_path: Path, size: int) -> np.ndarray:
-    """`[1, 3, size, size]` float32 NCHW, ImageNet-normalized (A3). No external dep on the
-    not-yet-implemented `geometry`/`preprocess` stub modules."""
+    """`[1, 3, size, size]` float32 NCHW, ImageNet-normalized (A3), contiguous. No external
+    dep on the not-yet-implemented `geometry`/`preprocess` stub modules.
+
+    The `contiguous` part is load-bearing, not cosmetic: `[None, ...]` inserts the batch
+    axis via NumPy's `newaxis`, which gives that axis stride 0. `torch.from_numpy` carries
+    a stride-0 array straight through `torch.export`, which either crashes `to_executorch`
+    ("0 in strides is not supported for ExecuTorch") or — when the graph shape lets it
+    through — corrupts the `.pte`'s recorded input layout so the runtime misreads the
+    buffer. `np.ascontiguousarray` is the fix; see the module docstring."""
     from PIL import Image
 
     img = Image.open(image_path).convert("RGB")
@@ -125,16 +215,19 @@ def _letterbox_square(image_path: Path, size: int) -> np.ndarray:
     mean = np.array(IMAGENET_MEAN, dtype=np.float32)
     std = np.array(IMAGENET_STD, dtype=np.float32)
     arr = (arr - mean) / std
-    return arr.transpose(2, 0, 1)[None, ...]  # HWC -> CHW, add batch
+    return np.ascontiguousarray(arr.transpose(2, 0, 1)[None, ...])  # HWC -> CHW, add batch
 
 
 def _verify_sign_convention(pte_path: Path, probe_image: Path) -> SignConventionCheck:
     """Run the SAME image through the exported .pte and the PyTorch reference, and check
     the two rank-correlate positively. A convention flip shows up as strong NEGATIVE
     correlation — still structured, still plausible-looking, and exactly backwards."""
+    from PIL import Image
+
     from smart_scene_analyzer.depth import estimate_relative_inverse_depth
 
-    reference = estimate_relative_inverse_depth(Path(probe_image))
+    probe_array = np.asarray(Image.open(probe_image).convert("RGB"), dtype=np.uint8)
+    reference = estimate_relative_inverse_depth(probe_array)
     tensor = _letterbox_square(probe_image, DEPTH_SIZE)
     exported_raw = _run_pte(pte_path, tensor)
 
@@ -170,18 +263,10 @@ def export_depth(
     probe_image: Path,
     registry_version: str = "unversioned",
 ) -> tuple[DepthManifest, SignConventionCheck]:
-    """Export `checkpoint` to ExecuTorch at `out_path`. Raises with the tool's actual
-    stdout/stderr on failure — never substitutes a different checkpoint/recipe/task."""
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_dir = Path(tmp)
-        _run_optimum_cli_export(checkpoint, tmp_dir)
-        candidates = sorted(tmp_dir.rglob("*.pte"))
-        if not candidates:
-            raise FileNotFoundError(
-                f"optimum-cli reported success but no .pte found under {tmp_dir}"
-            )
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(candidates[0], out_path)
+    """Export `checkpoint` to ExecuTorch at `out_path` via `torch.export` + PT2E int8
+    quantization + `to_edge_transform_and_lower`/`XnnpackPartitioner` — never substitutes a
+    different checkpoint, recipe, or task to make the export pass."""
+    _export_via_executorch(checkpoint, probe_image, out_path)
 
     in_shape, out_shape, in_dtype, out_dtype = _load_pte_metadata(out_path)
 

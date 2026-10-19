@@ -136,26 +136,109 @@ same pipeline should be expected to reproduce a similarly small, acceptable pari
 > shaped exists in this version at all (`image-classification` is the nearest vision task,
 > and is structurally the wrong shape — a single-label head, not a per-pixel output).
 >
+> **The CLI accepts `--task depth-estimation` at all because that name is real — just in
+> the wrong registry.** `depth-estimation` → `AutoModelForDepthEstimation` is a genuine,
+> documented task in `optimum`'s general-purpose `TasksManager` (the shared task
+> vocabulary used across every export backend — ONNX included). But whether a specific
+> backend can actually *act* on a task is decided by that backend's own registry, and
+> `optimum-executorch`'s is separate, smaller, and does not implement this one. That is
+> why the failure surfaces as a `None`-callable crash deep inside `main_export`, rather
+> than an upfront "unsupported task" error: the generic layer accepts the name, the
+> ExecuTorch-specific layer has nothing registered under it.
+>
+> **Re-verified 2026-10-19 — still absent, including on unreleased code.** 1.1.0 remains
+> the latest PyPI release (confirmed against PyPI's own version listing). `optimum-executorch`'s
+> unreleased `main` branch has moved since 1.1.0 — it has since added an
+> `object_detection.py` task that did not exist before — but still has no
+> `depth_estimation.py` anywhere. This was not a temporary gap this project happened to
+> catch mid-release; it is the current and still-advancing state of the library, and depth
+> support has not been the thing that advanced.
+>
 > **This is a library gap, not a model, recipe, or project defect.** The documented
-> command in Lesson 04's step-4 prompt cannot succeed against `optimum-executorch`
-> 1.1.0 until Hugging Face adds depth-estimation task support upstream, or this project
-> builds a lower-level export path directly on ExecuTorch's core `torch.export` /
-> `to_edge` / `to_executorch` APIs, bypassing `optimum`'s task abstraction entirely — a
-> substantially larger undertaking than this step's scope, and not attempted here without
-> explicit direction to do so.
+> command in Lesson 04's step-4 prompt cannot succeed against `optimum-executorch` until
+> Hugging Face adds a depth-estimation recipe to the ExecuTorch backend specifically (not
+> just to the general task vocabulary, which already lists it), or this project builds a
+> lower-level export path directly on ExecuTorch's core `torch.export` / `to_edge` /
+> `to_executorch` APIs, bypassing `optimum`'s task abstraction entirely — a substantially
+> larger undertaking than this step's scope, and not attempted here without explicit
+> direction to do so.
 
-INTENDED (unverified — no export to reconcile against):
+#### The lower-level path: attempted 2026-10-19, fixed and shipped 2026-10-19
+
+> **Both problems below are resolved. This is now the real export path** —
+> `src/smart_scene_analyzer/export/executorch.py`'s `export_depth()` calls it directly,
+> replacing the `optimum-cli` call documented above. Bypassing `optimum` entirely and
+> calling ExecuTorch's own core APIs directly (`torch.export.export` → PT2E int8
+> quantization → `to_edge_transform_and_lower` with `XnnpackPartitioner` →
+> `.to_executorch()`) **produces a real, shippable artifact**: `[1,3,518,518]` float32
+> input, native `[1,518,518]` unresized output, no resize inside the graph. This confirms
+> the earlier `optimum-cli` failure was specifically a missing *recipe* in that one
+> library, not evidence Depth Anything V2 is structurally unexportable to ExecuTorch —
+> exactly the distinction ADR 0001's amendment flagged as worth getting right.
+>
+> **Problem 1 (size) — fixed by quantizing, same idea as detection's `quantize=8`, a
+> different toolchain because this path has no CLI flag to do it for you.** ExecuTorch's
+> own PT2E flow — `XNNPACKQuantizer` with `get_symmetric_quantization_config(is_per_channel=True)`,
+> `prepare_pt2e` → calibrate on 8 real test-split images → `convert_pt2e` — run *before*
+> `to_edge_transform_and_lower`, not after. Unquantized float32 was 94.45 MiB (2.4× N9a's
+> entire 40 MB combined budget on its own); the quantized artifact is **24.35 MiB**.
+> Combined with detection's 2.90 MiB: **27.25 MiB, inside the 40 MB budget**, measured
+> rather than estimated, for the first time since ADR 0001 was written.
+>
+> **Problem 2 (the 0.74 "fidelity gap") — root cause was never `to_edge()`. It was a
+> non-contiguous input tensor, misdiagnosed by the earlier triangulation.** Re-running the
+> same stage-by-stage comparison (`torch.export` alone / bare `to_edge()` / `to_edge_transform_and_lower`
+> with XNNPACK) reproduced the 0.74 correlation initially — but the triangulation table
+> itself was a red herring, because all three stages were being driven by the *same*
+> corrupted example tensor. `_letterbox_square`'s `arr.transpose(2, 0, 1)[None, ...]`
+> inserts the batch axis via NumPy's `newaxis`, which gives that axis **stride 0**
+> (confirmed by inspecting the traced graph's placeholder node directly: `pixel_values`
+> carried `stride=(0, 1, 1554, 3)`). `torch.from_numpy` preserves that non-contiguous
+> layout straight through `torch.export`. Depending on graph shape, this either crashes
+> `to_executorch()` outright (`"0 in strides is not supported for ExecuTorch"` — this is
+> also where the project's own `_run_optimum_cli_export`-era attempts would have failed
+> had they gotten far enough to need real strides) or, as happened here, slips through and
+> corrupts the `.pte`'s recorded input layout so the runtime reads the buffer with the
+> wrong physical layout: shape-correct, values scrambled. **Fix: `.contiguous()` the
+> example tensor before `torch.export.export`** (`np.ascontiguousarray(...)` in
+> `_letterbox_square`, defensive `.contiguous()` again in `_run_pte`). Verified end to end
+> through the actual ExecuTorch runtime (`executorch.runtime.Runtime`, not just the
+> in-process `EdgeProgramManager`, which is pure Python and would not have caught a
+> runtime-level layout misread):
+>
+> | Pipeline | vs. eager, same input, run via `Runtime.get()` |
+>|---|---|
+> | Before fix (non-contiguous input) | Rank correlation **0.74** |
+> | After fix (`.contiguous()`), unquantized | Rank correlation **1.0000**, max abs diff 5.2×10⁻⁵ (float32 rounding) |
+> | After fix **and** int8 quantization, shipped artifact, mean of 8 fresh held-out images | Rank correlation **0.9447** (min 0.8748, max 0.9842, std 0.0387) — real quantization noise on a fine-grained regression task, not a lowering bug |
+>
+> The sign convention (larger=nearer) was never inverted in any of these — always positive
+> correlation, confirmed again on the shipped artifact via `_verify_sign_convention`
+> (ρ = 0.669 against this project's own `estimate_relative_inverse_depth` reference
+> function, which is a cruder heuristic than the HF model itself and not expected to track
+> it as tightly as eager-vs-exported does).
+>
+> **What this means for the op-level root-cause question the earlier write-up left open:**
+> it is moot. There was no `to_edge()` decomposition bug to find — the op-by-op diff
+> against `EdgeProgramManager` that was previously deferred would have found nothing,
+> because every stage downstream of the placeholder was faithfully propagating a stride-0
+> input it should never have received. The lesson is about the preprocessing boundary
+> (`torch.from_numpy` on a `[None, ...]`-constructed array), not the lowering pipeline.
+
+VERIFIED (export, 2026-10-19 — `export_depth()`, actual `scripts/export.py --depth` run):
 
 | Field | Value |
 |---|---|
-| Format | ExecuTorch (`.pte`), `xnnpack` recipe |
-| Input tensor | `[1, 3, 518, 518]`, float32, **NCHW** — fixed by the ViT-S/14 patch size (`518 = 14 × 37`; `640` is not a legal edge length for this backbone) |
+| Format | ExecuTorch (`.pte`), built via `torch.export` + `to_edge_transform_and_lower`/`XnnpackPartitioner`, not `optimum-cli` |
+| Input tensor | `[1, 3, 518, 518]`, float32, **NCHW**, contiguous — fixed by the ViT-S/14 patch size (`518 = 14 × 37`; `640` is not a legal edge length for this backbone) |
 | Normalization | ImageNet mean `(0.485, 0.456, 0.406)`, std `(0.229, 0.224, 0.225)`, per channel |
-| Output tensor | One tensor, native model resolution. **Must be `[518, 518]`, unresized** — any resize to `MODEL_INPUT` (640×640) belongs to the depth boundary at inference time, not inside the exported graph |
-| Output semantics | `relative-inverse-depth-larger-is-nearer` — no unit, arbitrary per-image scale. Verified against the PyTorch reference in step 4, not assumed from the export tool |
+| Output tensor | One tensor, native model resolution, `[1, 518, 518]`, unresized — any resize to `MODEL_INPUT` (640×640) belongs to the depth boundary at inference time, not inside the exported graph |
+| Output semantics | `relative-inverse-depth-larger-is-nearer` — no unit, arbitrary per-image scale. Verified against this project's reference depth function, not assumed from the export tool |
 | Label order | N/A — depth has no classes |
-| Quantization | None (float32 graph) |
-| Calibration set | N/A — no quantization |
+| Quantization | int8, PT2E flow (`XNNPACKQuantizer`, per-channel symmetric) |
+| Calibration set | 8 real test-split images, deterministic (sorted siblings of the probe image) |
+| Size | **24.35 MiB** (94.45 MiB unquantized) |
+| Fidelity vs. PyTorch eager | Mean rank correlation **0.9447** (min 0.8748, max 0.9842, std 0.0387), n=8 fresh held-out images, measured via the actual ExecuTorch runtime |
 
 **Why two squares and not one.** Both inputs are the same aspect-preserving, centre-padded
 letterbox of `SOURCE`, at two edge lengths. The nearest common legal square for both models

@@ -278,21 +278,89 @@ def test_detection_parity_per_class(comparisons):
     )
 
 
-def test_depth_parity_is_not_possible_yet():
-    """Round 3: depth export FAILED (Lesson 04 step 4) — `optimum-executorch` 1.1.0 has no
-    `depth-estimation` task registered, confirmed from its source. There is no `.pte` to
-    compare against. This is the finding, not a gap to quietly skip past — see
-    `docs/model-card-v1.md`'s Depth "Exported artifact" section for the full root cause.
+DEPTH_IMAGE_LIST_PATH = PROJECT_ROOT / "tests" / "fixtures" / "depth_parity_images.json"
+
+# Rank correlation, not raw value comparison (N14/ADR 0001: depth is relative, unit-less,
+# comparable only within one image — a raw-value diff would be comparing numbers that were
+# never meant to agree). int8 quantization noise on a 518x518 ViT regression is real and
+# bounded, not zero: these floors were set from the measured range (mean 0.9447, min 0.8748,
+# n=8 held-out images, 2026-10-19), not fit to make a borderline case pass.
+DEPTH_MEAN_RANK_CORR_FLOOR = 0.85
+DEPTH_MIN_RANK_CORR_FLOOR = 0.7
+
+
+def _load_depth_image_list() -> list[Path]:
+    data = json.loads(DEPTH_IMAGE_LIST_PATH.read_text())
+    return [PROJECT_ROOT / p for p in data["images"]]
+
+
+def _rank_correlation(a: np.ndarray, b: np.ndarray) -> float:
+    ar = a.ravel().argsort().argsort().astype(np.float64)
+    br = b.ravel().argsort().argsort().astype(np.float64)
+    return float(np.corrcoef(ar, br)[0, 1])
+
+
+def test_depth_export_parity():
+    """Round 3: compared against PyTorch eager directly, on the SAME letterboxed input
+    tensor the export itself used — never the artifact against itself in a second runtime.
+    Deliberately disjoint from the int8 calibration set (see depth_parity_images.json's own
+    comment): calibration images are not held out, so testing on them would overstate
+    fidelity.
     """
     depth_pte = PROJECT_ROOT / "app" / "assets" / "models" / "depth.pte"
     if not depth_pte.is_file():
         pytest.skip(
-            "depth.pte does not exist — the export failed (optimum-executorch has no "
-            "depth-estimation task). Depth parity cannot be checked until a depth export "
-            "exists. See docs/model-card-v1.md."
+            "depth.pte does not exist. Run `uv run python scripts/export.py --depth` "
+            "(data/v1 and the checkpoint download must be available)."
         )
-    pytest.fail(
-        "depth.pte now exists but this test was not updated to check it — write the real "
-        "depth parity check (ranking comparison on the raw 518x518 raster, per Round 3) "
-        "before removing this guard."
+    if not MANIFEST_PATH.is_file():
+        pytest.skip(f"{MANIFEST_PATH} not present — depth has not been exported.")
+
+    images = [p for p in _load_depth_image_list() if p.is_file()]
+    missing = len(_load_depth_image_list()) - len(images)
+    if missing:
+        pytest.skip(
+            f"{missing} depth parity test-split images not present "
+            "(data/v1 is gitignored) — run the Lesson 02/03 dataset steps first."
+        )
+
+    manifest = json.loads(MANIFEST_PATH.read_text())
+    checkpoint = manifest["depth"]["registry_version"]
+
+    import torch
+
+    from smart_scene_analyzer.export.executorch import (
+        DEPTH_SIZE,
+        _letterbox_square,
+        _load_depth_wrapper,
+        _run_pte,
+    )
+
+    wrapper = _load_depth_wrapper(checkpoint)
+
+    correlations: list[tuple[str, float]] = []
+    with torch.no_grad():
+        for image_path in images:
+            arr = _letterbox_square(image_path, DEPTH_SIZE)
+            eager_out = wrapper(torch.from_numpy(arr).contiguous()).numpy()
+            exported_out = _run_pte(depth_pte, arr)
+            rho = _rank_correlation(exported_out, eager_out)
+            correlations.append((image_path.name, rho))
+
+    for name, rho in correlations:
+        print(f"  {name}: rank correlation = {rho:.4f}")
+
+    rhos = np.array([rho for _, rho in correlations])
+    mean_rho, min_rho = float(rhos.mean()), float(rhos.min())
+    print(f"mean = {mean_rho:.4f}, min = {min_rho:.4f}, n = {len(rhos)}")
+
+    worst_name, worst_rho = min(correlations, key=lambda item: item[1])
+    assert min_rho >= DEPTH_MIN_RANK_CORR_FLOOR, (
+        f"{worst_name} scored rank correlation {worst_rho:.4f} against PyTorch eager — "
+        f"below the {DEPTH_MIN_RANK_CORR_FLOOR} floor for a single held-out image."
+    )
+    assert mean_rho >= DEPTH_MEAN_RANK_CORR_FLOOR, (
+        f"Mean rank correlation {mean_rho:.4f} across {len(rhos)} held-out images is below "
+        f"the {DEPTH_MEAN_RANK_CORR_FLOOR} floor — more than ordinary int8 quantization "
+        "noise; see docs/model-card-v1.md's Depth 'Exported artifact' section."
     )

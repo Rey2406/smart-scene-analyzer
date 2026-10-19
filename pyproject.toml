@@ -98,6 +98,7 @@ module = [
     "tensorflow.*",
     "executorch.*",
     "optimum.*",
+    "torchao.*",
 ]
 ignore_missing_imports = true
 

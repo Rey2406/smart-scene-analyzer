@@ -1,0 +1,13 @@
+{
+  "_comment": "A fixed, deterministic set of test-split images for depth export parity (Lesson 04, step 6, Round 3). Deliberately NOT the same set as export_parity_images.json: export_depth()'s probe image is sorted(test/images)[0], and its int8 calibration set is the next 8 sorted siblings of that probe image — exactly the images export_parity_images.json lists. Measuring parity on calibration images would overstate fidelity. This file picks sorted(test/images)[30:38] instead, far enough past the calibration slice to stay disjoint even if the calibration count changes.",
+  "images": [
+    "data/v1/test/images/kv2_kinect2data_000027_2014-05-26_14-46-26_260595134347_rgbf000091-resize_0000091.jpg",
+    "data/v1/test/images/kv2_kinect2data_000038_2014-05-26_14-54-53_260595134347_rgbf000021-resize_0000021.jpg",
+    "data/v1/test/images/kv2_kinect2data_000050_2014-05-26_15-02-42_260595134347_rgbf000151-resize_0000151.jpg",
+    "data/v1/test/images/kv2_kinect2data_000061_2014-04-29_14-37-44_094959634447_rgbf000100-resize_0000100.jpg",
+    "data/v1/test/images/kv2_kinect2data_000072_2014-05-16_20-15-47_260595134347_rgbf000250-resize_0000250.jpg",
+    "data/v1/test/images/kv2_kinect2data_000082_2014-05-14_21-38-22_260595134347_rgbf000151-resize_0000151.jpg",
+    "data/v1/test/images/kv2_kinect2data_000094_2014-05-14_21-50-54_260595134347_rgbf000151-resize_0000151.jpg",
+    "data/v1/test/images/kv2_kinect2data_000105_2014-05-14_22-02-56_260595134347_rgbf000102-resize_0000102.jpg"
+  ]
+}

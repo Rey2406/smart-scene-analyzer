@@ -71,10 +71,18 @@ app-store review.
   `ai-edge-litert`) was only found by running the export and reading the failure. This is
   exactly the "an export toolchain" cost named above, now with a specific shape: it is not
   a one-time cost, it is a target that moves under a pinned dependency.
-- **One of the two models could not be exported at all.** `optimum-executorch` 1.1.0 has
-  no `depth-estimation` task registered — not a quantization or accuracy failure, a
-  missing capability in the library this plan depends on. The fusion-layer duplication
-  cost above assumed both sides would exist to duplicate; right now only detection does.
+- **One of the two models could not be exported at all.** `optimum-executorch` has no
+  `depth-estimation` task registered in its own ExecuTorch-specific task registry — not a
+  quantization or accuracy failure, a missing capability in the library this plan depends
+  on. (The task name itself is real — `optimum`'s *general* `TasksManager`, shared across
+  every export backend, already lists `depth-estimation`; it is specifically the
+  ExecuTorch backend's narrower registry that has nothing registered under it.) **Checked
+  twice, five days apart (2026-10-15, 2026-10-19): unchanged.** 1.1.0 remains the latest
+  PyPI release, and even unreleased `main` — which has gained an `object_detection` task
+  in that window — still has no `depth_estimation.py`. This is not a gap that happened to
+  be caught mid-release; it is the current, still-advancing state of the library, moving
+  on everything except this. The fusion-layer duplication cost above assumed both sides
+  would exist to duplicate; right now only detection does.
 - **Quantization is not free on the classes that were already weak.** `storage`'s mean
   confidence dropped 0.133 under int8 — small in isolation, but stacked on a class that
   was already this model's second-weakest (`docs/evaluation-v1.md`). The export cost is
@@ -111,11 +119,11 @@ detection model; the depth model's export failed outright, which is itself a fin
 | Artifact | Size | Status |
 |---|---|---|
 | Detection (`detector.tflite`, int8) | **2.90 MiB** | Exported successfully |
-| Depth (`depth.pte`, ExecuTorch) | — | **FAILED.** `optimum-executorch` 1.1.0 has no `depth-estimation` export task registered — confirmed from its source, not inferred from the error alone. Not a quantization or accuracy problem; a toolchain gap. See `docs/model-card-v1.md`'s Depth "Exported artifact" section |
+| Depth (`depth.pte`, ExecuTorch, int8) | **24.35 MiB** | Exported successfully, 2026-10-19, via the lower-level ExecuTorch path (`optimum-cli` remains broken for the reason below; no longer the code path `export_depth()` uses) |
 
-Only one of the two planned on-device artifacts exists. N9a's 40 MB combined budget is
-therefore unverified on its real constraint — comparing two artifacts — because there is
-only one to weigh.
+**Combined: 27.25 MiB, inside N9a's 40 MB budget — measured on both artifacts, not
+estimated on one.** This closed out 2026-10-19, same day as the fix; see this ADR's
+"Revisit when" section for the fidelity-gap finding that came with it.
 
 **Export parity** (`tests/test_export_parity.py`, 8 held-out test-split images, 2026-10-15):
 
@@ -125,7 +133,7 @@ only one to weigh.
 | Match rate | 34/37 = 91.9% |
 | Worst per-class confidence delta | `storage`, **−0.133** (quantization shifted this already-weak class's confidence down further; `door` moved the other way, +0.123 — evidence the shift is quantization noise, not one-directional) |
 | Mean IoU, every class | ≥ 0.866 — box geometry well preserved |
-| Depth parity | **Not measurable** — no `.pte` artifact exists to compare |
+| Depth parity | **Measured 2026-10-19** (added after export fixed, same day): mean rank correlation 0.9447 vs. PyTorch eager, min 0.8748, max 0.9842, std 0.0387, n=8 fresh held-out images — ordinary int8 quantization noise, not a lowering defect. See `docs/model-card-v1.md`'s Depth "Exported artifact" section for the before/after table that isolates this from the unrelated stride-corruption bug it was originally mistaken for |
 
 **Default execution backend per platform** (`docs/execution-target-comparison.md`,
 2026-10-15, every availability claim cited with a URL and check date):
@@ -155,21 +163,41 @@ Any of the following becomes true:
 
 - The combined size of two native runtimes plus two artifacts proves unaffordable against
   `docs/artifact-budget.md`, **and** consolidating onto a single runtime does not recover
-  it. (Consolidation is the first fallback, not a return to the cloud.) **Partially
-  unmeasurable right now**: only the detection artifact's size (2.90 MiB) is known; the
-  depth side of this comparison cannot be evaluated until an export exists.
+  it. (Consolidation is the first fallback, not a return to the cloud.) **Now measurable
+  on both sides, as of 2026-10-19**: detection is 2.90 MiB, depth (quantized) is 24.35 MiB,
+  combined 27.25 MiB — inside N9a's 40 MB artifact budget. Still open: the two **native
+  runtime libraries'** combined size (`react-native-fast-tflite` + `react-native-executorch`),
+  which is a Lesson 05 measurement, not an artifact-size one.
 - Peak RSS with both models loaded excludes a device class the product must support.
   **Still open** — requires Lesson 05's on-device measurement; nothing in Lesson 04 could
   measure this on a development machine.
 - A required capability genuinely cannot run on-device — a model too large to quantize
-  without unacceptable accuracy loss, for instance. **Not yet triggered, but the closest
-  live example of what this looks like**: the depth export's current failure is a
-  toolchain-support gap (`optimum-executorch` has no depth-estimation task), not a proof
-  that Depth Anything V2 cannot run on-device at all — a lower-level export path direct on
-  ExecuTorch's core APIs remains untried. If that path is attempted and *also* fails for a
-  capability reason (not a library-support reason), **that** would trigger this clause.
-  Confusing a toolchain gap for a capability gap here would be the wrong kind of mistake —
-  it would abandon on-device depth over a library version, not a real constraint.
+  without unacceptable accuracy loss, for instance. **Not triggered, and now settled
+  rather than merely argued.** `optimum-cli`'s depth-estimation gap was confirmed to be
+  exactly the toolchain-support gap this bullet predicted, not a capability gap: on
+  2026-10-19, the lower-level path direct on ExecuTorch's core APIs (`torch.export` →
+  `to_edge_transform_and_lower` → `XnnpackPartitioner` → `.to_executorch()`, bypassing
+  `optimum` entirely) was attempted and **succeeded mechanically** — a `.pte` with the
+  correct contract shapes, sign convention not inverted. Depth Anything V2 is not
+  structurally blocked from running on-device; the missing-task failure really was about
+  one library's recipe coverage, not the model or the platform.
+  **The two problems that first attempt surfaced are both fixed, same day.** The 94.45 MiB
+  unquantized size is now **24.35 MiB** after int8 quantization through ExecuTorch's own
+  PT2E flow (`XNNPACKQuantizer`, calibrated on 8 real images) — combined with detection's
+  2.90 MiB, **27.25 MiB, inside N9a's 40 MB budget, measured rather than estimated**. The
+  0.74 rank-correlation "fidelity gap" turned out not to be a `to_edge()` lowering bug at
+  all: the preprocessing helper's `arr.transpose(2, 0, 1)[None, ...]` gave the batch axis
+  stride 0, and `torch.export` faithfully propagated that corrupted, non-contiguous
+  layout through every stage the earlier triangulation checked — which is why
+  `torch.export` alone, bare `to_edge()`, and XNNPACK-delegated `to_edge_transform_and_lower`
+  all looked identically wrong: they were all tracing the same bad input. Fixing the input
+  tensor to be contiguous before `torch.export` restores rank correlation to **1.0000**
+  unquantized, and the shipped quantized artifact measures **0.9447** mean rank
+  correlation against PyTorch eager (min 0.8748, max 0.9842, std 0.0387, n=8 fresh
+  held-out images) — ordinary, bounded quantization noise on a fine-grained regression
+  task, not a structural defect. This path now replaces `optimum-cli` as the real
+  `export_depth()` implementation. See `docs/model-card-v1.md`'s Depth "Exported artifact"
+  section for the full before/after comparison table.
 
 Cost or convenience alone is not a trigger. The offline and privacy properties above are
 load-bearing product behaviour, not implementation detail.
