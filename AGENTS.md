@@ -89,16 +89,17 @@ a server back on the request path.
 | `.claude/skills/` | This project's own procedures |
 | `.claude/hooks/` | Enforcement scripts — Claude Code only; see the note below |
 
-**The table above is the target layout, not what is on disk today.** This repo is the
-Lesson 01 scaffold: the harness is complete — the role definitions, the procedures, the
-two ledgers, the ADR template, `pyproject.toml` — and the system it constrains is not yet
-written. `src/smart_scene_analyzer/` holds only `__init__.py`, `app/` is an empty
-directory with a README explaining why, `tests/` holds only the units-guard test, and
-`docs/architecture.md`, `docs/taxonomy.md`, and the ADRs referenced elsewhere in this file
-do not exist yet. Neither does `plugins/smart-scene-analyzer/`, which the marketplace
-manifest points at — the Codex plugin install in `README.md` cannot succeed until it is
-built. Do not treat any of these absences as breakage; each is created by the lesson that
-needs it, and lands where this table says.
+**The table above is the target layout. Lesson 04 finished the Python side**:
+`src/smart_scene_analyzer/` is a real package (training, export, fusion, geometry,
+inference, preprocess), `tests/` covers it, and `docs/architecture.md`, `docs/taxonomy.md`,
+and ADRs 0001–0004 all exist. **Lesson 05 is scaffolding the mobile side.** `app/` is a
+real Expo development build — both ML runtimes installed, `app/assets/models/` holds the
+real exported artifacts — but `app/src/` (the TypeScript fusion port,
+`inference/detector.ts`, `inference/depth.ts`, `geometry/toScreen.ts`, the Photo/Live tabs)
+does not exist yet. Still genuinely missing: `plugins/smart-scene-analyzer/`, which the
+marketplace manifest points at — the Codex plugin install in `README.md` cannot succeed
+until it is built. Do not treat either absence as breakage; each lands where this table
+says when its lesson builds it.
 
 ## Engineering roles
 
@@ -181,6 +182,10 @@ the rule more precisely than prose can. In summary, what they check:
 ### TypeScript (`app/`)
 
 - Expo SDK with TypeScript. `npm` for the app; `uv` never touches `app/`.
+- **Node 22.13+.** The current Expo SDK/React Native toolchain (Metro, the RN CLI)
+  requires it — `npm install` warns loudly (`EBADENGINE`) under Node 20, and `expo
+  start`/`expo run:*` print their own warning too. `nvm` is the easy way to manage this
+  alongside other projects' Node versions.
 - **This is a development build, not Expo Go.** Both ML runtimes are native modules, so
   the app cannot run in the Expo Go sandbox.
 - **`app/ios/` and `app/android/` are generated and gitignored.** `expo prebuild` writes
