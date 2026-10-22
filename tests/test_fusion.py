@@ -265,12 +265,27 @@ def _load_fusion_cases() -> list[dict]:
     return json.loads(FUSION_CASES_PATH.read_text())
 
 
+def _parse_depth_values(raw: list[list[float | str]]) -> np.ndarray:
+    """Plain JSON has no literal NaN/Infinity (Python's `json` module accepts the bare
+    tokens as a non-standard extension, but JS `JSON.parse` rejects them outright, and
+    this fixture file must load in both languages). Non-finite depth samples are
+    therefore encoded as the strings "NaN" / "Infinity" / "-Infinity" instead of bare
+    numbers; this converts them back before building the array. The TypeScript loader
+    applies the same convention to the same file.
+    """
+    sentinels = {"NaN": np.nan, "Infinity": np.inf, "-Infinity": -np.inf}
+    return np.array(
+        [[sentinels.get(v, v) if isinstance(v, str) else v for v in row] for row in raw],
+        dtype=np.float32,
+    )
+
+
 @pytest.mark.parametrize("case", _load_fusion_cases(), ids=lambda c: c["name"])
 def test_shared_fusion_fixture_matches_python(case):
     """Loads the SAME plain-JSON file Lesson 05's TypeScript suite will load, so the two
     implementations can never silently diverge — a disagreement here is the finding, never
     a reason to adjust the fixture (`docs/architecture.md` C12)."""
-    values = np.array(case["depth_map"]["values"], dtype=np.float32)
+    values = _parse_depth_values(case["depth_map"]["values"])
     t = case["transform"]
     transform = LetterboxTransform(
         scale=t["scale"],
@@ -311,3 +326,5 @@ def test_shared_fusion_fixture_matches_python(case):
             )
         assert actual.depth_rank == expected["depth_rank"]
         assert actual.depth_sample_count == expected["depth_sample_count"]
+        if "depth_quality" in expected:
+            assert actual.depth_quality == expected["depth_quality"]

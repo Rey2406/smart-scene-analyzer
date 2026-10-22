@@ -291,14 +291,16 @@
           "relative_depth_normalized": 0.8333333333333334,
           "depth_rank": 0,
           "depth_spread": 0.16666666666666666,
-          "depth_sample_count": 32
+          "depth_sample_count": 32,
+          "depth_quality": "ok"
         },
         {
           "relative_depth": 1.5,
           "relative_depth_normalized": 0.16666666666666666,
           "depth_rank": 1,
           "depth_spread": 0.16666666666666666,
-          "depth_sample_count": 32
+          "depth_sample_count": 32,
+          "depth_quality": "ok"
         }
       ]
     },
@@ -589,7 +591,8 @@
           "relative_depth_normalized": null,
           "depth_rank": null,
           "depth_spread": null,
-          "depth_sample_count": 0
+          "depth_sample_count": 0,
+          "depth_quality": "unavailable"
         }
       ]
     },
@@ -880,7 +883,8 @@
           "relative_depth_normalized": 0.16666666666666666,
           "depth_rank": 0,
           "depth_spread": 0.16666666666666666,
-          "depth_sample_count": 20
+          "depth_sample_count": 20,
+          "depth_quality": "ok"
         }
       ]
     },
@@ -1229,14 +1233,679 @@
           "relative_depth_normalized": 0.8333333333333334,
           "depth_rank": 0,
           "depth_spread": 0.16666666666666666,
-          "depth_sample_count": 60
+          "depth_sample_count": 60,
+          "depth_quality": "ok"
         },
         {
           "relative_depth": 3.0,
           "relative_depth_normalized": 0.16666666666666666,
           "depth_rank": 1,
           "depth_spread": 0.16666666666666666,
-          "depth_sample_count": 60
+          "depth_sample_count": 60,
+          "depth_quality": "ok"
+        }
+      ]
+    },
+    "tolerance": {
+      "relative_depth": 1e-05,
+      "normalized": 1e-05
+    }
+  },
+  {
+    "name": "box_entirely_outside_image",
+    "why": "A box with no overlap at all with the valid/content rect must degrade to None fields and depth_quality 'unavailable', not an error or a crash.",
+    "depth_map": {
+      "size": [
+        10,
+        20
+      ],
+      "values": [
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ]
+      ]
+    },
+    "transform": {
+      "scale": 1.0,
+      "pad_x": 0.0,
+      "pad_y": 0.0,
+      "in_w": 10,
+      "in_h": 20,
+      "out_w": 10,
+      "out_h": 20
+    },
+    "detections": [
+      {
+        "bbox": [
+          100.0,
+          0.0,
+          150.0,
+          5.0
+        ],
+        "class_id": 0,
+        "confidence": 0.9
+      }
+    ],
+    "source_size": {
+      "w": 10,
+      "h": 20
+    },
+    "expected": {
+      "detections": [
+        {
+          "relative_depth": null,
+          "relative_depth_normalized": null,
+          "depth_rank": null,
+          "depth_spread": null,
+          "depth_sample_count": 0,
+          "depth_quality": "unavailable"
+        }
+      ]
+    },
+    "tolerance": {
+      "relative_depth": 1e-05,
+      "normalized": 1e-05
+    }
+  },
+  {
+    "name": "box_with_no_valid_depth_values",
+    "why": "A box whose entire sampled region is non-finite (every depth sample NaN) must degrade the same way as 'entirely outside', but via a different code path inside reduce_box (step 5: all samples dropped as non-finite, not a failed intersect).",
+    "depth_map": {
+      "size": [
+        4,
+        4
+      ],
+      "values": [
+        [
+          "NaN",
+          "NaN",
+          "NaN",
+          "NaN"
+        ],
+        [
+          "NaN",
+          "NaN",
+          "NaN",
+          "NaN"
+        ],
+        [
+          "NaN",
+          "NaN",
+          "NaN",
+          "NaN"
+        ],
+        [
+          "NaN",
+          "NaN",
+          "NaN",
+          "NaN"
+        ]
+      ]
+    },
+    "transform": {
+      "scale": 1.0,
+      "pad_x": 0.0,
+      "pad_y": 0.0,
+      "in_w": 4,
+      "in_h": 4,
+      "out_w": 4,
+      "out_h": 4
+    },
+    "detections": [
+      {
+        "bbox": [
+          0.0,
+          0.0,
+          4.0,
+          4.0
+        ],
+        "class_id": 0,
+        "confidence": 0.9
+      }
+    ],
+    "source_size": {
+      "w": 4,
+      "h": 4
+    },
+    "expected": {
+      "detections": [
+        {
+          "relative_depth": null,
+          "relative_depth_normalized": null,
+          "depth_rank": null,
+          "depth_spread": null,
+          "depth_sample_count": 0,
+          "depth_quality": "unavailable"
+        }
+      ]
+    },
+    "tolerance": {
+      "relative_depth": 1e-05,
+      "normalized": 1e-05
+    }
+  },
+  {
+    "name": "box_of_exactly_one_pixel",
+    "why": "A 1x1 box: insetting by the default 0.125 fraction collapses it below the 1px floor, so reduce_box falls back to the un-inset box -- depth_quality must report 'fallback_full_box', not silently 'ok'.",
+    "depth_map": {
+      "size": [
+        10,
+        20
+      ],
+      "values": [
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ]
+      ]
+    },
+    "transform": {
+      "scale": 1.0,
+      "pad_x": 0.0,
+      "pad_y": 0.0,
+      "in_w": 10,
+      "in_h": 20,
+      "out_w": 10,
+      "out_h": 20
+    },
+    "detections": [
+      {
+        "bbox": [
+          3.0,
+          3.0,
+          4.0,
+          4.0
+        ],
+        "class_id": 0,
+        "confidence": 0.9
+      }
+    ],
+    "source_size": {
+      "w": 10,
+      "h": 20
+    },
+    "expected": {
+      "detections": [
+        {
+          "relative_depth": 3.0,
+          "relative_depth_normalized": 0.3333333333333333,
+          "depth_rank": 0,
+          "depth_spread": 0.0,
+          "depth_sample_count": 1,
+          "depth_quality": "fallback_full_box"
         }
       ]
     },

@@ -1,0 +1,11 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  },
+  // *.test.ts excluded from the app-wide `tsc --noEmit` check: no test runner
+  // (jest/jest-expo) is installed yet (Lesson 05 step 6 -- see its Round 1 report), so
+  // `describe`/`it`/`expect` have no type declarations. Drop this exclusion once a
+  // runner is added; its own config type-checks these files independently.
+  "exclude": ["**/*.test.ts"]
+}

@@ -7,17 +7,22 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "assetBundlePatterns": ["assets/models/*"],
+    "assetBundlePatterns": [
+      "assets/models/*"
+    ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.smartsceneanalyzer.app"
+      "bundleIdentifier": "com.smartsceneanalyzer.app",
+      "appleTeamId": "GU7ZZCR4DY"
     },
     "android": {
       "package": "com.smartsceneanalyzer.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#000000"
-      }
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
     },
     "plugins": [
       [
@@ -47,7 +52,8 @@
             "minSdkVersion": 33
           }
         }
-      ]
+      ],
+      "expo-video"
     ]
   }
 }

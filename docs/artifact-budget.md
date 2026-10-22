@@ -77,9 +77,9 @@ number is not a budget, it is a description.
 | Depth model | | **24.35 MiB** (int8) | 2026-10-19 | Exported via the lower-level ExecuTorch path (`torch.export` + PT2E `XNNPACKQuantizer` + `to_edge_transform_and_lower`), not `optimum-cli` — that CLI has no `depth-estimation` recipe at all, confirmed and unchanged as of this date. Unquantized float32 was 94.45 MiB; int8 (per-channel symmetric, calibrated on 8 real images) brought it to this figure at a measured 0.9447 mean rank correlation against PyTorch eager. See `docs/model-card-v1.md`'s Depth "Exported artifact" section |
 | **Bundled models, total** | | **27.25 MiB** | 2026-10-19 | 2.90 + 24.35 — inside N9a's 40 MB combined budget, measured on both artifacts |
 | Android install size | | | | From the Play Console or `bundletool` |
-| iOS install size | | | | From App Store Connect or a local `.ipa` |
-| Peak RSS, both models loaded | | | | The number that decides which phones are excluded |
-| Cold model load, both | | | | Seconds. The user is staring at a spinner for this |
+| iOS install size | | | | Not measured — no signed `.ipa`/App Store Connect build exists yet, only a local debug development build. Needs a release build before this row can be filled honestly |
+| Peak RSS, both models loaded | *(no target was pre-stated)* | **911.1 MB**, simulator | 2026-10-20 | `ps -o rss=` against the iPhone 17 Simulator process, debug build with Metro attached, Apple M5 Pro Mac — **not a device figure**, see `docs/latency-report.md`'s Memory section for the full method and the 556.7 MB (baseline) / 876.8 MB (idle) breakdown. Must not share a row with a real-device number per this project's own rule against mixing simulator and device figures |
+| Cold model load, both | | Depth: **51 ms** · Detection: **N/A — not measured** | 2026-10-20 | Depth figure is real, on-device `execute()` timing (simulator). Detection cold load is moot: `loadDetectorModel()` has zero call sites in the current app (bypassed in favor of a bundled fixture tensor, per `docs/latency-report.md`), so there is nothing to time yet |
 
 ### How to measure install size honestly
 

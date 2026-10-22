@@ -1,0 +1,62 @@
+{
+  "image": "kv2_align_kv2_2014-12-18_11-47-06_260595134347_0000037.jpg",
+  "image_size": {
+    "width": 730,
+    "height": 530
+  },
+  "detection_source": "NOT on-device -- react-native-fast-tflite Invoke() fails on detector.tflite (confirmed again this round, see round1-ondevice-patch-test.md); boxes below are BORROWED from the PyTorch reference set so depth ORDERING can still be checked against something real. These are NOT the app's own detections.",
+  "depth_source": "REAL on-device react-native-executorch execute() on depth.pte, iPhone 17 Simulator iOS 27.0, image docs/parity-evidence/app-depth-raw.json",
+  "detections": [
+    {
+      "class_id": 2,
+      "label": "chair",
+      "confidence": 0.9164215922355652,
+      "box_source_px": [
+        156.46348571777344,
+        102.0613021850586,
+        278.9017028808594,
+        302.1368408203125
+      ],
+      "relative_depth": 0.5606154799461365,
+      "depth_rank": 2,
+      "depth_spread": 0.05942623572281716,
+      "depth_quality": "ok",
+      "depth_sample_count": 828,
+      "depth_source": "app_on_device"
+    },
+    {
+      "class_id": 8,
+      "label": "storage",
+      "confidence": 0.8497111201286316,
+      "box_source_px": [
+        256.959228515625,
+        4.885319709777832,
+        564.5814819335938,
+        496.1741638183594
+      ],
+      "relative_depth": 3.3286545276641846,
+      "depth_rank": 0,
+      "depth_spread": 0.23770488711683602,
+      "depth_quality": "ok",
+      "depth_sample_count": 912,
+      "depth_source": "app_on_device"
+    },
+    {
+      "class_id": 2,
+      "label": "chair",
+      "confidence": 0.3209320604801178,
+      "box_source_px": [
+        0.047396957874298096,
+        224.8733367919922,
+        55.05886459350586,
+        524.5709228515625
+      ],
+      "relative_depth": 2.2775003910064697,
+      "depth_rank": 1,
+      "depth_spread": 0.35245902536535445,
+      "depth_quality": "mixed_region",
+      "depth_sample_count": 594,
+      "depth_source": "app_on_device"
+    }
+  ]
+}

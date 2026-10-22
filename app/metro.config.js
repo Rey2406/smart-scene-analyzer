@@ -1,4 +1,4 @@
-// Metro bundler config — Expo SDK 57.
+// Metro bundler config — Expo SDK 58.
 //
 // The default Metro config does not know about `.tflite` or `.pte` files. It
 // silently drops them from the bundle at BUILD time -- there is no error here.
