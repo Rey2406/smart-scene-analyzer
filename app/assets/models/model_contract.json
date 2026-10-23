@@ -1,7 +1,7 @@
 {
   "detector": {
     "file": "detector.tflite",
-    "sha256": "3f5bf68248e5c36abf4f2fb260c38f1ec27d76203a22cc61e054f510b93ad83d",
+    "sha256": "4aaaf0addf949ae3c5cab64a00ffb996027a67699a12c7e6bb4bab3b35fdb0e3",
     "registry_version": "v1-baseline",
     "input": {
       "shape": [

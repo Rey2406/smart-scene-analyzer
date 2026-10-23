@@ -19,25 +19,19 @@
  *    This agrees with docs/model-card-v1.md's own empirical determination (cxcywh at a
  *    100% valid-box rate vs. 0% for xyxy; p95 coordinate 0.89).
  *
- *  IMPORTANT CAVEAT on where the VALUES above came from: on-device `model.runSync()` /
- *  `model.run()` currently throws `TFLite: Failed to run TFLite Model! Status: error` for
- *  ANY input on this device -- a flat all-0.5 tensor fails exactly like the real image
- *  does, so this is a structural failure (invoke(), not decode), not a data problem. The
- *  tensor VALUES cited above (and used to write this decoder) came from running the
- *  identical `app/assets/models/detector.tflite` file through the Python reference
- *  (`ai_edge_litert.Interpreter`, the runtime `tests/test_export_parity.py` already uses)
- *  on the same bundled test image. The SHAPE/DTYPE conclusion is independently confirmed
- *  on-device; the VALUE-level evidence (monotonic cx, min/max) is not, until the runtime
- *  mismatch below is resolved. Full diagnostic in the Round 1 report: interpreter
- *  construction and `TfLiteInterpreterAllocateTensors` succeed on-device (so the graph's
- *  op codes resolve), but `TfLiteInterpreterInvoke` fails generically every time. The
- *  likely cause is a version skew between the export toolchain (`litert-torch` 0.9.4 /
- *  `ai-edge-litert` 2.2.0 -- the newer "LiteRT" generation) and
- *  `react-native-fast-tflite@3.0.1`'s iOS pod, which pins the older classic
- *  `TensorFlowLiteC 2.17.0` (confirmed in `ios/Podfile.lock`; 3.0.1 is also the latest
- *  published version of the library, so there is no newer release to pick up a newer pod).
- *  This is an artifact/toolchain contract issue, not something to route around here --
- *  flagged rather than silently patched, per the mobile agent's constraints.
+ *  HISTORICAL NOTE on where the VALUES above came from: on-device `model.runSync()` used
+ *  to throw `TFLite: Failed to run TFLite Model! Status: error` for ANY input, and the
+ *  tensor values this decoder was originally written against came from the Python
+ *  reference instead. That blocker is resolved as of Lesson 05 step 12 round 2 --
+ *  `detector.tflite`'s quantization step (`ai_edge_quantizer`, inside `litert_torch`'s
+ *  export path) was serializing large weight buffers with TFLite's out-of-line
+ *  `Buffer.Offset()`/`Size()` convention, which the app's pinned `TensorFlowLiteC 2.17.0`
+ *  doesn't resolve through either of its model-loading APIs.
+ *  `src/smart_scene_analyzer/export/tflite.py`'s `export_detector` now inlines those
+ *  buffers back into the classic format as a post-export step, which fixes it. On-device
+ *  `runSync()` now succeeds and feeds this decoder real tensors -- see
+ *  `docs/parity-evidence/round2-invoke-root-cause.md` for the full diagnosis and fix, and
+ *  `app/src/pipeline/analyzeImage.ts`'s header for how it's wired into the real pipeline.
  */
 import { labelFor, LABELS, type Label } from '../labels';
 

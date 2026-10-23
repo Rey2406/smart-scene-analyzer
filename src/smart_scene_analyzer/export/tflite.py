@@ -154,6 +154,38 @@ def _probe_output_encoding(
     )
 
 
+def _inline_offset_buffers(tflite_path: Path) -> None:
+    """Resolves `litert_torch`/`ai_edge_quantizer`'s out-of-line `Buffer.Offset()`/`Size()`
+    constant-tensor convention back into the FlatBuffer's classic inline `data` vector,
+    in place.
+
+    `export_litert`'s quantization step (`ai_edge_quantizer.quantizer.Quantizer`) writes
+    large weight/bias buffers out-of-line, appended after the FlatBuffer root, so they can
+    be mmap'd zero-copy. That's a real, valid TFLite feature — Python's `ai_edge_litert`
+    runtime resolves it correctly — but `react-native-fast-tflite`'s pinned
+    `TensorFlowLiteC 2.17.0` does not, through either of its model-loading entry points
+    (confirmed on-device both ways). `Invoke()` fails with "Input tensor N lacks data" the
+    moment it reaches the first such tensor, even though `AllocateTensors()` succeeds (shape
+    and dtype are metadata, always present) — see
+    docs/parity-evidence/round2-invoke-root-cause.md in the course repo this package comes
+    from for the full on-device diagnosis.
+
+    `ai_edge_litert.tools.flatbuffer_utils.read_model` already resolves every
+    offset-based buffer into `buffer.data` as a normal part of reading a model (it has to,
+    to let callers inspect tensor contents at all); `write_model` only supports writing a
+    model generated with the offset convention turned off. Round-tripping through this
+    pair is therefore a real fix, not a workaround -- confirmed byte-for-byte identical
+    inference output (same all-zero input, `ai_edge_litert.Interpreter`, before vs. after)
+    and confirmed on-device via `Invoke()` succeeding where it previously failed, every
+    time, consistent with the Python reference within ordinary int8/XNNPACK
+    cross-platform noise (~0.08% relative, mean output value).
+    """
+    from ai_edge_litert.tools import flatbuffer_utils
+
+    model = flatbuffer_utils.read_model(tflite_path)
+    flatbuffer_utils.write_model(model, tflite_path)
+
+
 def export_detector(
     checkpoint: Path,
     out_path: Path,
@@ -185,6 +217,7 @@ def export_detector(
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(exported_path, out_path)
+    _inline_offset_buffers(out_path)
 
     interpreter = _load_interpreter(out_path)
     input_details = interpreter.get_input_details()[0]

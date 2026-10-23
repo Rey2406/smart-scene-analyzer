@@ -12,29 +12,26 @@
  * (a picker result, a camera still, or a clip-replay thumbnail) rather than only a
  * `require()`'d asset module.
  *
- * WHAT'S REAL vs SUBSTITUTED, carried over unchanged from the diagnostic screen's own
- * header (still true, still flagged every time this function runs):
- *   - decodeImage, toModelInput (both letterboxes), decodeDetections, nms, and
- *     runDepthInference's execute() call are ALL real and run on-device, for whatever
- *     image `uri` points to.
- *   - The DETECTOR's raw tensor is still the Python-reference fixture
- *     (round4-python-reference-raw-tensor.json): on-device `model.run()` /
- *     `model.runSync()` currently throws structurally on this device/toolchain
- *     combination (see decode.ts's header for the full diagnostic -- a
- *     react-native-fast-tflite / export-toolchain version skew, already escalated, not
- *     fixed here). The SAME fixture tensor is reused for every call, regardless of
- *     which image produced it -- decodeDetections' output only depends on the raw
- *     tensor + the 640x640 model-input size, not on the pixels. This means the boxes
- *     drawn will not semantically match whatever is actually in a live camera frame or
- *     a picked photo; only the GEOMETRY (where a box lands, how it tracks depth rank)
- *     is being exercised honestly. Flagged here, in the Round 2 (Lesson 05 step 6)
- *     report, and in every report since -- not something to silently stop mentioning.
- *   - Each kept box's `relativeDepth` IS real: sampled from the real depth map at the
- *     box's own region, using the DEPTH model's own (separate) letterbox -- via the
- *     real fusion port (Lesson 05 step 10, `app/src/fusion/index.ts`), not an inline
- *     median anymore. See that module's header for the full reduction (median, inset,
- *     stride, depth_quality classification) ported from
- *     `src/smart_scene_analyzer/fusion.py`.
+ * Every stage is real and runs on-device for whatever image `uri` points to:
+ * decodeImage, toModelInput (both letterboxes), the detector's own `runSync()` call,
+ * decodeDetections, nms, and runDepthInference's `execute()` call. Each kept box's
+ * `relativeDepth` is sampled from the real depth map at the box's own region, using the
+ * DEPTH model's own (separate) letterbox -- via the real fusion port
+ * (`app/src/fusion/index.ts`), not an inline median. See that module's header for the
+ * full reduction (median, inset, stride, depth_quality classification) ported from
+ * `src/smart_scene_analyzer/fusion.py`.
+ *
+ * Until Lesson 05 step 12 round 2, the detector half of this was substituted with a
+ * frozen Python-reference fixture tensor: `react-native-fast-tflite`'s `Invoke()` failed
+ * structurally against this export, on both Simulator and device. Root cause (not a
+ * runtime/toolchain mismatch after all): `detector.tflite`'s quantization step
+ * (`ai_edge_quantizer`, inside `litert_torch`'s export path) serializes large weight
+ * buffers using TFLite's out-of-line `Buffer.Offset()`/`Size()` convention, which the
+ * app's pinned `TensorFlowLiteC 2.17.0` doesn't resolve through either of its
+ * model-loading APIs. `src/smart_scene_analyzer/export/tflite.py`'s `export_detector`
+ * now inlines those buffers back into the classic format as a post-export step
+ * (`_inline_offset_buffers`), which fixes it -- confirmed on-device, see
+ * `docs/parity-evidence/round2-invoke-root-cause.md` for the full diagnosis.
  */
 import { Image as RNImage } from 'react-native';
 
@@ -42,6 +39,7 @@ import { decodeImage, type RGBPixels, type Size } from '../inference/image';
 import { toModelInput, type ChannelNorm } from '../inference/preprocess';
 import { decodeDetections, type ModelInputBox } from '../inference/decode';
 import { nms, NMS_IOU_THRESHOLD } from '../inference/nms';
+import { loadDetectorModel } from '../inference/detector';
 import { runDepthInference } from '../inference/depth';
 import { fuse, contentRect, type DepthMap, type LetterboxTransform } from '../fusion';
 import type { DetectionOverlayState, OverlayDetection } from '../components/DetectionOverlay';
@@ -50,10 +48,6 @@ import { timeAsync, timeSync } from '../dev/phaseTimers';
 const SOURCE_LONG_SIDE = 640;
 const DETECTOR_INPUT_SIZE = { width: 640, height: 640 };
 const DETECTOR_NORM: ChannelNorm = { mean: [0, 0, 0], std: [1, 1, 1] };
-
-// Same fixture the Round 3+4 diagnostic screen used -- see this module's header for why
-// an on-device raw tensor isn't available yet.
-const RAW_TENSOR_FIXTURE = require('../../assets/fixtures/round4-python-reference-raw-tensor.json');
 
 export interface AnalyzeImageResult {
   /** SOURCE pixel size of the (already longSide-resized) decoded image -- see image.ts's
@@ -111,16 +105,28 @@ export async function analyzeImageUri(uri: string): Promise<AnalyzeImageResult> 
   );
   const detectorLetterbox = { scale: detectorModelInput.scale, padX: detectorModelInput.padX, padY: detectorModelInput.padY };
 
-  // 'detectionInference' is NEVER recorded on this path -- there is no model.run() /
-  // model.runSync() call here at all. The raw tensor comes from a bundled fixture
-  // (RAW_TENSOR_FIXTURE), not from invoking detector.tflite. See this module's own
-  // header and app/src/inference/decode.ts's header for why: react-native-fast-tflite's
-  // Invoke() is structurally broken against this export toolchain, on BOTH simulator
-  // and device. docs/latency-report.md reports this phase as N/A, not zero -- a zero
-  // would read as "measured, and fast," which is false.
-  const rawData: number[] = RAW_TENSOR_FIXTURE.data;
-  const raw = new Float32Array(rawData);
-  const [, features, anchors] = RAW_TENSOR_FIXTURE.shape as [number, number, number];
+  // Cold load is self-timed and self-reported inside loadDetectorModel() (its own
+  // `loadMs`, console-logged there) -- matches loadDepthModel()'s identical convention in
+  // depth.ts. Cached after the first call, so this is near-instant on every later frame.
+  const detectorState = await loadDetectorModel();
+  if (detectorState.status !== 'ready') {
+    throw new Error(
+      `analyzeImageUri: detector model failed to load (status: ${detectorState.status})`
+    );
+  }
+
+  const rawOutputs = timeSync('detectionInference', () =>
+    // `Float32Array.buffer` is typed ArrayBufferLike (also covers SharedArrayBuffer);
+    // toModelInput always constructs a fresh `new Float32Array(...)`, so this is always
+    // a real ArrayBuffer at runtime.
+    detectorState.model.runSync([detectorModelInput.data.buffer as ArrayBuffer])
+  );
+  const raw = new Float32Array(rawOutputs[0]!);
+  // Read features/anchors back from the loaded model's own metadata (outputs[0].shape is
+  // [1, features, anchors]) rather than a hardcoded constant -- matches detector.ts's own
+  // "trust the loaded model, not the card" convention.
+  const outputShape = detectorState.model.outputs[0]!.shape;
+  const [, features, anchors] = outputShape as [number, number, number];
   const { decoded, kept } = timeSync('decodeNms', () => {
     const decoded = decodeDetections(raw, { anchors, features }, DETECTOR_INPUT_SIZE);
     const kept = nms(decoded, NMS_IOU_THRESHOLD);

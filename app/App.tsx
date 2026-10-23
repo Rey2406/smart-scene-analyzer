@@ -13,6 +13,7 @@ import {
 import type { LayoutChangeEvent } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Device from 'expo-device';
 import * as ImagePicker from 'expo-image-picker';
 import { createVideoPlayer, type VideoPlayer } from 'expo-video';
 
@@ -286,17 +287,12 @@ function LiveTab({ active }: { active: boolean }) {
   const cameraRef = useRef<CameraView | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    CameraView.isAvailableAsync()
-      .then((available) => {
-        if (!cancelled) setHasCamera(available);
-      })
-      .catch(() => {
-        if (!cancelled) setHasCamera(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    // CameraView.isAvailableAsync() is unusable here: expo-camera's iOS native module
+    // never implements it (confirmed in node_modules/expo-camera/ios/CameraViewModule.swift
+    // -- no such method exists), so the call always throws UnavailabilityError on iOS,
+    // Simulator or real device alike. Device.isDevice is the Expo-documented way to tell
+    // them apart instead -- false only in the Simulator, true on every real handset.
+    setHasCamera(Device.isDevice);
   }, []);
 
   const cameraAvailability: CameraAvailability = useMemo(() => {
