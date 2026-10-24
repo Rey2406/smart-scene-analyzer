@@ -600,7 +600,26 @@ function CameraSourcePanel({
   // that makes "overlay is on the still, not the preview" visible side by side.
   return (
     <View style={styles.cameraPreviewWrap}>
-      <CameraView ref={cameraRef} style={styles.cameraPreview} facing="back" />
+      {/* collapsable={false} + CameraView as its ONLY child: under Fabric, a sibling
+          reordering anywhere in this subtree's ancestor chain (e.g. LiveTab swapping
+          which source panel is mounted when sourceKind changes) commits as a native
+          Remove + Insert of CameraView, not a prop update -- removeFromSuperview() tears
+          the AVCaptureSession down (CameraView.swift's stopSession()), and the
+          re-insertion's didMoveToWindow() is a no-op because startSessionIfNeeded()'s
+          didStartSession guard is already true, so the session never rebuilds. Confirmed
+          on-device: onCameraReady fires and resumePreview() resolves fine, yet the
+          preview stays black -- consistent with the session having been torn down by a
+          mutation JS never saw, not a permission/hardware/event-delivery problem. Root
+          cause and the collapsable={false}-sole-child fix are both documented in
+          https://github.com/expo/expo/issues/50015. No siblings inside this wrapper --
+          any conditional content goes outside it, never between it and CameraView. */}
+      <View collapsable={false} style={styles.cameraPreview}>
+        {/* animateShutter={false}: unrelated to the Fabric bug above -- expo-camera's
+            shutter flash briefly drops previewLayer.opacity on every takePictureAsync()
+            call, which Live mode does roughly every LIVE_INTERVAL_MS. Pointless and
+            visually distracting there, so disabled outright; harmless either way. */}
+        <CameraView ref={cameraRef} style={styles.cameraPreviewInner} facing="back" animateShutter={false} />
+      </View>
       <Text style={styles.hint}>live preview -- boxes are drawn on the captured still below, not here</Text>
     </View>
   );
@@ -767,5 +786,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#000',
     marginBottom: 4,
+    overflow: 'hidden',
+  },
+  cameraPreviewInner: {
+    width: '100%',
+    height: '100%',
   },
 });
